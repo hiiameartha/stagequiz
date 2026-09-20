@@ -10,15 +10,23 @@ import type {
 
 export type QuizSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
+function socketUrl(): string | undefined {
+  const url = process.env.NEXT_PUBLIC_SOCKET_URL?.trim();
+  if (!url) return undefined; // same origin (local mono / Railway all-in-one)
+  return url.replace(/\/$/, "");
+}
+
 export function useQuizSocket() {
   const socketRef = useRef<QuizSocket | null>(null);
   const [connected, setConnected] = useState(false);
   const [state, setState] = useState<RoomState | null>(null);
 
   useEffect(() => {
-    const socket: QuizSocket = io({
+    const url = socketUrl();
+    const socket: QuizSocket = io(url, {
       path: "/socket.io",
       autoConnect: true,
+      transports: ["websocket", "polling"],
     });
     socketRef.current = socket;
 

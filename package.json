@@ -4,8 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch server/index.ts",
+    "dev:web": "next dev",
+    "dev:split": "concurrently -k -n web,rt -c cyan,magenta \"next dev\" \"tsx watch server/realtime.ts\"",
+    "realtime": "tsx server/realtime.ts",
     "build": "next build",
     "start": "NODE_ENV=production tsx server/index.ts",
+    "start:realtime": "NODE_ENV=production tsx server/realtime.ts",
     "lint": "eslint"
   },
   "dependencies": {
