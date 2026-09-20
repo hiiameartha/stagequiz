@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { calcPointsEarned } from "../src/lib/quiz/scoring";
+import { isAudioRoundMedia } from "../src/lib/quiz/media";
 import {
   MAX_PLAYERS,
   isAvatarId,
@@ -238,9 +239,38 @@ export class RoomManager {
 
     room.currentIndex = index;
     room.phase = "answering";
+    room.timer = null;
+
+    // 音樂題：等 Host 按播放才開始倒數
+    if (isAudioRoundMedia(q.media)) {
+      room.questionEndsAt = null;
+      return;
+    }
+
     const limitMs = q.timeLimitSec * 1000;
     room.questionEndsAt = Date.now() + limitMs;
     room.timer = setTimeout(onTimeout, limitMs);
+  }
+
+  /** Host 點播放音樂後啟動倒數（可重複呼叫，已開始則忽略） */
+  armQuestionTimer(room: Room, onTimeout: () => void) {
+    if (room.phase !== "answering") {
+      return { ok: false as const, error: "目前無法開始計時" };
+    }
+    if (room.questionEndsAt != null) {
+      return { ok: true as const, room, already: true as const };
+    }
+    const q = room.questions[room.currentIndex];
+    if (!q) return { ok: false as const, error: "沒有題目" };
+    if (!isAudioRoundMedia(q.media)) {
+      return { ok: false as const, error: "此題不需手動開始計時" };
+    }
+
+    if (room.timer) clearTimeout(room.timer);
+    const limitMs = q.timeLimitSec * 1000;
+    room.questionEndsAt = Date.now() + limitMs;
+    room.timer = setTimeout(onTimeout, limitMs);
+    return { ok: true as const, room, already: false as const };
   }
 
   submitAnswer(code: string, playerId: string, choice: number) {
@@ -250,6 +280,10 @@ export class RoomManager {
 
     const q = room.questions[room.currentIndex];
     if (!q) return { ok: false as const, error: "沒有題目" };
+
+    if (room.questionEndsAt == null && isAudioRoundMedia(q.media)) {
+      return { ok: false as const, error: "請等待音樂開始後再作答" };
+    }
 
     const player = room.players.find((p) => p.id === playerId);
     if (!player) return { ok: false as const, error: "找不到玩家" };
@@ -315,7 +349,8 @@ export class RoomManager {
       ? room.players.filter((p) => Boolean(p.answers[q.id])).length
       : 0;
 
-    const stripAudioUrl = !opts.forHost;
+    // 作答中不給挑戰者音訊／YouTube URL；公布答案後可看正解影片
+    const stripAudioUrl = !opts.forHost && room.phase === "answering";
     const showCurrent =
       room.phase === "answering" || room.phase === "reveal" || room.phase === "final";
 

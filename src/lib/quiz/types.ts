@@ -176,6 +176,10 @@ export type ClientToServerEvents = {
     payload: { code: string; hostId: string },
     ack?: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
+  "host:startTimer": (
+    payload: { code: string; hostId: string },
+    ack?: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
   "host:kick": (
     payload: { code: string; hostId: string; playerId: string },
     ack?: (res: { ok: true } | { ok: false; error: string }) => void
