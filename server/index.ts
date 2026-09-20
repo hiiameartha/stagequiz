@@ -228,6 +228,6 @@ app.prepare().then(() => {
   });
 
   httpServer.listen(port, hostname, () => {
-    console.log(`> Quiz Party ready on http://${hostname}:${port}`);
+    console.log(`> StageQuiz ready on http://${hostname}:${port}`);
   });
 });

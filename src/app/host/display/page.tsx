@@ -44,7 +44,7 @@ function DisplayInner() {
       <header className="animate-fade-up flex items-end justify-between">
         <div>
           <p className="text-sm uppercase tracking-[0.25em] text-amber-300/70">
-            Quiz Party
+            StageQuiz
           </p>
           <h1 className="font-display text-5xl text-amber-100">
             {state.phase === "lobby" && "等待挑戰者"}

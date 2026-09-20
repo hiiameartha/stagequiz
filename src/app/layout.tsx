@@ -14,7 +14,7 @@ const sans = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Quiz Party",
+  title: "StageQuiz",
   description: "Host / Client 即時限時問答競賽",
 };
 

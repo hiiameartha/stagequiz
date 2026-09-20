@@ -1,4 +1,4 @@
-# Quiz Party
+# StageQuiz
 
 - Host / Client 即時限時問答；音樂僅 Host／展示屏播放
 - 大廳不公開題目內容；挑戰者選動物頭像

@@ -11,7 +11,7 @@ export default function HomePage() {
           Live Quiz
         </p>
         <h1 className="mt-3 font-display text-6xl leading-none text-amber-50 md:text-7xl">
-          Quiz Party
+          StageQuiz
         </h1>
         <p className="mt-5 max-w-md text-lg text-white/65">
           Host 控場、最多 20 位挑戰者同步搶答。支援圖片題、歌曲題、限時計分與最終名次。
