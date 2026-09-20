@@ -5,7 +5,16 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from "../src/lib/quiz/types";
-import { RoomManager } from "./room-manager";
+import {
+  isDbEnabled,
+  listMatchesForHost,
+  loadQuestionBank,
+  loadRoomSnapshot,
+  saveMatch,
+  saveQuestionBank,
+  saveRoom,
+} from "./db/persist";
+import { RoomManager, type Room } from "./room-manager";
 
 type SocketData = {
   code?: string;
@@ -24,6 +33,12 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
     }
   );
 
+  if (isDbEnabled()) {
+    console.log("> Postgres persistence enabled");
+  } else {
+    console.log("> Postgres persistence disabled (no DATABASE_URL)");
+  }
+
   function emitState(code: string) {
     const room = rooms.get(code);
     if (!room) return;
@@ -37,15 +52,62 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
     }
   }
 
+  async function persistRoom(room: Room) {
+    await saveRoom(room);
+  }
+
+  async function finishAndPersist(room: Room) {
+    rooms.finish(room);
+    await persistRoom(room);
+    const leaderboard = [...room.players]
+      .sort((a, b) => b.score - a.score)
+      .map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, score: p.score }));
+    await saveMatch({
+      code: room.code,
+      hostId: room.hostId,
+      leaderboard,
+      questionCount: room.questions.length,
+    });
+  }
+
   function revealAndEmit(code: string) {
     const room = rooms.get(code);
     if (!room || room.phase !== "answering") return;
     rooms.reveal(room);
+    void persistRoom(room);
     emitState(code);
   }
 
+  function restoreAnsweringTimer(room: Room) {
+    if (room.phase !== "answering") return;
+    const endsAt = room.questionEndsAt;
+    if (endsAt == null) {
+      rooms.reveal(room);
+      void persistRoom(room);
+      return;
+    }
+    const remaining = endsAt - Date.now();
+    if (remaining <= 0) {
+      rooms.reveal(room);
+      void persistRoom(room);
+      return;
+    }
+    if (room.timer) clearTimeout(room.timer);
+    room.timer = setTimeout(() => revealAndEmit(room.code), remaining);
+  }
+
+  async function ensureRoom(code: string): Promise<Room | undefined> {
+    const existing = rooms.get(code);
+    if (existing) return existing;
+    const snap = await loadRoomSnapshot(code);
+    if (!snap) return undefined;
+    const room = rooms.hydrate(snap);
+    restoreAnsweringTimer(room);
+    return room;
+  }
+
   io.on("connection", (socket) => {
-    socket.on("room:create", (payload, ack) => {
+    socket.on("room:create", async (payload, ack) => {
       try {
         const questions =
           payload.questions && payload.questions.length > 0
@@ -54,6 +116,8 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
         const room = rooms.create(payload.hostId, questions);
         socket.data = { code: room.code, hostId: payload.hostId, role: "host" };
         socket.join(room.code);
+        await persistRoom(room);
+        await saveQuestionBank(questions);
         ack?.({ ok: true, code: room.code });
         emitState(room.code);
       } catch (e) {
@@ -61,7 +125,8 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
       }
     });
 
-    socket.on("room:join", (payload, ack) => {
+    socket.on("room:join", async (payload, ack) => {
+      await ensureRoom(payload.code);
       const result = rooms.join(
         payload.code,
         payload.playerId,
@@ -78,11 +143,13 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
         role: "player",
       };
       socket.join(result.room.code);
+      await persistRoom(result.room);
       ack?.({ ok: true });
       emitState(result.room.code);
     });
 
-    socket.on("room:rejoin", (payload, ack) => {
+    socket.on("room:rejoin", async (payload, ack) => {
+      await ensureRoom(payload.code);
       const result = rooms.rejoin(payload.code, payload.playerId, payload.role);
       if (!result.ok) {
         ack?.({ ok: false, error: result.error });
@@ -96,31 +163,78 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
           : { playerId: payload.playerId }),
       };
       socket.join(result.room.code);
+      await persistRoom(result.room);
       ack?.({ ok: true });
       emitState(result.room.code);
     });
 
-    socket.on("host:setQuestions", (payload, ack) => {
+    socket.on("host:loadBank", async (_payload, ack) => {
+      try {
+        const questions = await loadQuestionBank();
+        ack?.({ ok: true, questions });
+      } catch (e) {
+        ack?.({
+          ok: false,
+          error: e instanceof Error ? e.message : "載入題庫失敗",
+        });
+      }
+    });
+
+    socket.on("host:saveBank", async (payload, ack) => {
+      try {
+        if (!payload.questions?.length) {
+          ack?.({ ok: false, error: "至少需要一題" });
+          return;
+        }
+        await saveQuestionBank(payload.questions);
+        ack?.({ ok: true });
+      } catch (e) {
+        ack?.({
+          ok: false,
+          error: e instanceof Error ? e.message : "儲存題庫失敗",
+        });
+      }
+    });
+
+    socket.on("host:listMatches", async (payload, ack) => {
+      try {
+        const list = await listMatchesForHost(payload.hostId);
+        ack?.({ ok: true, matches: list });
+      } catch (e) {
+        ack?.({
+          ok: false,
+          error: e instanceof Error ? e.message : "載入歷史失敗",
+        });
+      }
+    });
+
+    socket.on("host:setQuestions", async (payload, ack) => {
+      await ensureRoom(payload.code);
       const result = rooms.setQuestions(payload.code, payload.hostId, payload.questions);
       if (!result.ok) {
         ack?.({ ok: false, error: result.error });
         return;
       }
+      await persistRoom(result.room);
+      await saveQuestionBank(payload.questions);
       ack?.({ ok: true });
       emitState(result.room.code);
     });
 
-    socket.on("host:kick", (payload, ack) => {
+    socket.on("host:kick", async (payload, ack) => {
+      await ensureRoom(payload.code);
       const result = rooms.kick(payload.code, payload.hostId, payload.playerId);
       if (!result.ok) {
         ack?.({ ok: false, error: result.error });
         return;
       }
+      await persistRoom(result.room);
       ack?.({ ok: true });
       emitState(result.room.code);
     });
 
-    socket.on("host:start", (payload, ack) => {
+    socket.on("host:start", async (payload, ack) => {
+      await ensureRoom(payload.code);
       const room = rooms.get(payload.code);
       if (!room) {
         ack?.({ ok: false, error: "找不到房間" });
@@ -144,11 +258,13 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
       }
 
       rooms.startQuestion(room, 0, () => revealAndEmit(room.code));
+      await persistRoom(room);
       ack?.({ ok: true });
       emitState(room.code);
     });
 
-    socket.on("host:next", (payload, ack) => {
+    socket.on("host:next", async (payload, ack) => {
+      await ensureRoom(payload.code);
       const room = rooms.get(payload.code);
       if (!room) {
         ack?.({ ok: false, error: "找不到房間" });
@@ -165,18 +281,20 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
 
       const nextIndex = room.currentIndex + 1;
       if (nextIndex >= room.questions.length) {
-        rooms.finish(room);
+        await finishAndPersist(room);
         ack?.({ ok: true });
         emitState(room.code);
         return;
       }
 
       rooms.startQuestion(room, nextIndex, () => revealAndEmit(room.code));
+      await persistRoom(room);
       ack?.({ ok: true });
       emitState(room.code);
     });
 
-    socket.on("host:forceReveal", (payload, ack) => {
+    socket.on("host:forceReveal", async (payload, ack) => {
+      await ensureRoom(payload.code);
       const room = rooms.get(payload.code);
       if (!room) {
         ack?.({ ok: false, error: "找不到房間" });
@@ -194,12 +312,14 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
       ack?.({ ok: true });
     });
 
-    socket.on("answer:submit", (payload, ack) => {
+    socket.on("answer:submit", async (payload, ack) => {
+      await ensureRoom(payload.code);
       const result = rooms.submitAnswer(payload.code, payload.playerId, payload.choice);
       if (!result.ok) {
         ack?.({ ok: false, error: result.error });
         return;
       }
+      await persistRoom(result.room);
       ack?.({ ok: true });
       emitState(result.room.code);
       if (result.allAnswered) {
@@ -210,7 +330,11 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
     socket.on("disconnect", () => {
       const { code, playerId, hostId } = socket.data;
       rooms.markDisconnected(code, socket.id, { playerId, hostId });
-      if (code) emitState(code);
+      if (code) {
+        const room = rooms.get(code);
+        if (room) void persistRoom(room);
+        emitState(code);
+      }
     });
   });
 

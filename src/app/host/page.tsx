@@ -11,7 +11,10 @@ import { RankingChart } from "@/components/RankingChart";
 import { Timer } from "@/components/Timer";
 import { SAMPLE_QUESTIONS } from "@/lib/quiz/sample-questions";
 import { getOrCreateId, useQuizSocket } from "@/lib/socket";
-import type { Question } from "@/lib/quiz/types";
+import type { MatchSummary, Question } from "@/lib/quiz/types";
+import { avatarEmoji } from "@/lib/quiz/types";
+
+const SHARED_BANK_CACHE_KEY = "quiz-host-questions:bank:shared";
 
 function loadHostBootstrap(): {
   hostId: string;
@@ -24,7 +27,17 @@ function loadHostBootstrap(): {
   const hostId = getOrCreateId("quiz-host-id");
   const code = localStorage.getItem("quiz-host-code") ?? "";
   let questions = SAMPLE_QUESTIONS;
-  if (code) {
+
+  const bankSaved =
+    localStorage.getItem(SHARED_BANK_CACHE_KEY) ??
+    localStorage.getItem(`quiz-host-questions:bank:${hostId}`);
+  if (bankSaved) {
+    try {
+      questions = JSON.parse(bankSaved) as Question[];
+    } catch {
+      /* ignore */
+    }
+  } else if (code) {
     const savedQs = localStorage.getItem(`quiz-host-questions:${code}`);
     if (savedQs) {
       try {
@@ -37,6 +50,13 @@ function loadHostBootstrap(): {
   return { hostId, code, questions };
 }
 
+function cacheQuestions(code: string, questions: Question[]) {
+  localStorage.setItem(SHARED_BANK_CACHE_KEY, JSON.stringify(questions));
+  if (code) {
+    localStorage.setItem(`quiz-host-questions:${code}`, JSON.stringify(questions));
+  }
+}
+
 export default function HostPage() {
   const { socket, connected, state } = useQuizSocket();
   const [boot] = useState(loadHostBootstrap);
@@ -45,7 +65,31 @@ export default function HostPage() {
   const [questions, setQuestions] = useState<Question[]>(boot.questions);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saveHint, setSaveHint] = useState("");
+  const [matches, setMatches] = useState<MatchSummary[]>([]);
   const rejoinedRef = useRef(false);
+  const bankLoadedRef = useRef(false);
+  const matchesLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (!connected || !hostId || bankLoadedRef.current) return;
+    if (!socket.current) return;
+    bankLoadedRef.current = true;
+    socket.current.emit("host:loadBank", { hostId }, (res) => {
+      if (!res?.ok || !res.questions?.length) return;
+      setQuestions(res.questions);
+      cacheQuestions(code, res.questions);
+    });
+  }, [connected, hostId, code, socket]);
+
+  useEffect(() => {
+    if (!connected || !hostId || matchesLoadedRef.current) return;
+    if (!socket.current) return;
+    matchesLoadedRef.current = true;
+    socket.current.emit("host:listMatches", { hostId }, (res) => {
+      if (res?.ok) setMatches(res.matches);
+    });
+  }, [connected, hostId, socket]);
 
   useEffect(() => {
     if (!connected || !code || !hostId || rejoinedRef.current) return;
@@ -64,46 +108,83 @@ export default function HostPage() {
     );
   }, [connected, code, hostId, socket]);
 
+  useEffect(() => {
+    if (!questions.length) return;
+    localStorage.setItem(SHARED_BANK_CACHE_KEY, JSON.stringify(questions));
+  }, [questions]);
+
+  useEffect(() => {
+    if (state?.phase !== "final" || !socket.current || !hostId) return;
+    socket.current.emit("host:listMatches", { hostId }, (res) => {
+      if (res?.ok) setMatches(res.matches);
+    });
+  }, [state?.phase, hostId, socket]);
+
+  function refreshMatches() {
+    if (!socket.current || !hostId) return;
+    socket.current.emit("host:listMatches", { hostId }, (res) => {
+      if (res?.ok) setMatches(res.matches);
+    });
+  }
+
   function createRoom() {
     if (!socket.current || !hostId) return;
     setBusy(true);
     setError("");
-    socket.current.emit(
-      "room:create",
-      { hostId, questions },
-      (res) => {
-        setBusy(false);
-        if (!res?.ok) {
-          setError(res?.error ?? "建房失敗");
-          return;
-        }
-        setCode(res.code);
-        localStorage.setItem("quiz-host-code", res.code);
-        localStorage.setItem(
-          `quiz-host-questions:${res.code}`,
-          JSON.stringify(questions)
-        );
-        rejoinedRef.current = true;
+    socket.current.emit("room:create", { hostId, questions }, (res) => {
+      setBusy(false);
+      if (!res?.ok) {
+        setError(res?.error ?? "建房失敗");
+        return;
       }
-    );
+      setCode(res.code);
+      localStorage.setItem("quiz-host-code", res.code);
+      cacheQuestions(res.code, questions);
+      rejoinedRef.current = true;
+    });
   }
 
   function saveQuestions() {
-    if (!socket.current || !code || !hostId) return;
+    if (!socket.current || !hostId) return;
+    if (!questions.length) {
+      setError("至少需要一題");
+      return;
+    }
     setBusy(true);
+    setError("");
+    setSaveHint("");
     socket.current.emit(
-      "host:setQuestions",
-      { code, hostId, questions },
-      (res) => {
-        setBusy(false);
+      "host:saveBank",
+      { hostId, questions },
+      async (res) => {
         if (!res?.ok) {
+          setBusy(false);
           setError(res?.error ?? "儲存失敗");
           return;
         }
-        localStorage.setItem(
-          `quiz-host-questions:${code}`,
-          JSON.stringify(questions)
-        );
+        cacheQuestions(code, questions);
+
+        // 若已在大廳房間，一併同步該場次題目
+        if (code && (!state || state.phase === "lobby")) {
+          const roomRes = await new Promise<
+            { ok: true } | { ok: false; error: string }
+          >((resolve) => {
+            socket.current!.emit(
+              "host:setQuestions",
+              { code, hostId, questions },
+              (r) => resolve(r ?? { ok: false, error: "同步房間失敗" })
+            );
+          });
+          setBusy(false);
+          if (!roomRes.ok) {
+            setError(roomRes.error);
+            return;
+          }
+        } else {
+          setBusy(false);
+        }
+        setSaveHint("題庫已存到雲端");
+        window.setTimeout(() => setSaveHint(""), 2500);
       }
     );
   }
@@ -126,10 +207,7 @@ export default function HostPage() {
       setError(saveRes.error);
       return;
     }
-    localStorage.setItem(
-      `quiz-host-questions:${code}`,
-      JSON.stringify(questions)
-    );
+    cacheQuestions(code, questions);
     socket.current.emit("host:start", { code, hostId }, (res) => {
       setBusy(false);
       if (!res?.ok) setError(res?.error ?? "開始失敗");
@@ -141,6 +219,7 @@ export default function HostPage() {
     setError("");
     socket.current.emit(event, { code, hostId }, (res) => {
       if (!res?.ok) setError(res?.error ?? "操作失敗");
+      if (event === "host:next") refreshMatches();
     });
   }
 
@@ -192,17 +271,74 @@ export default function HostPage() {
       {!code && (
         <section className="rounded-3xl bg-black/30 p-6 ring-1 ring-white/10">
           <p className="mb-4 text-white/70">
-            編輯題庫後建立房間，挑戰者用房號加入（最多 20 人）。
+            題庫全站共用一份，可隨時存到雲端；之後再建立房間給挑戰者加入（最多 20 人）。
           </p>
           <QuestionEditor questions={questions} onChange={setQuestions} />
-          <button
-            type="button"
-            disabled={busy || !connected}
-            onClick={createRoom}
-            className="mt-6 rounded-2xl bg-amber-400 px-6 py-3 font-display text-lg text-ink hover:bg-amber-300 disabled:opacity-40"
-          >
-            建立房間
-          </button>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={busy || !connected}
+              onClick={saveQuestions}
+              className="rounded-2xl bg-white/10 px-6 py-3 text-sm ring-1 ring-white/15 hover:bg-white/15 disabled:opacity-40"
+            >
+              儲存題庫
+            </button>
+            <button
+              type="button"
+              disabled={busy || !connected}
+              onClick={createRoom}
+              className="rounded-2xl bg-amber-400 px-6 py-3 font-display text-lg text-ink hover:bg-amber-300 disabled:opacity-40"
+            >
+              建立房間
+            </button>
+            {saveHint && <span className="text-sm text-emerald-300/90">{saveHint}</span>}
+          </div>
+        </section>
+      )}
+
+      {matches.length > 0 && (
+        <section className="rounded-3xl bg-black/30 p-5 ring-1 ring-white/10">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="font-display text-lg text-amber-200">近期比賽</h2>
+            <button
+              type="button"
+              onClick={refreshMatches}
+              className="text-xs text-white/50 hover:text-white/80"
+            >
+              重新整理
+            </button>
+          </div>
+          <ul className="space-y-3">
+            {matches.map((m) => {
+              const top = m.leaderboard.slice(0, 3);
+              const when = new Date(m.finishedAt).toLocaleString("zh-TW", {
+                month: "numeric",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              return (
+                <li
+                  key={m.id}
+                  className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm"
+                >
+                  <div>
+                    <span className="font-mono tracking-wider text-amber-100/90">{m.code}</span>
+                    <span className="ml-2 text-white/40">{when}</span>
+                    <span className="ml-2 text-white/40">{m.questionCount} 題</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-white/70">
+                    {top.map((p, i) => (
+                      <span key={p.id}>
+                        {i + 1}.{avatarEmoji(p.avatar)} {p.name} {p.score}
+                      </span>
+                    ))}
+                    {!top.length && <span className="text-white/40">無玩家</span>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 
@@ -236,7 +372,7 @@ export default function HostPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2">
                 {inLobby && (
                   <>
                     <button
@@ -255,6 +391,9 @@ export default function HostPage() {
                     >
                       開始競賽
                     </button>
+                    {saveHint && (
+                      <span className="text-sm text-emerald-300/90">{saveHint}</span>
+                    )}
                   </>
                 )}
                 {answering && (
