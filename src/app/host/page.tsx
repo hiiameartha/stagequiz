@@ -11,7 +11,8 @@ import { RankingChart } from "@/components/RankingChart";
 import { Timer } from "@/components/Timer";
 import { SAMPLE_QUESTIONS } from "@/lib/quiz/sample-questions";
 import { getOrCreateId, useQuizSocket } from "@/lib/socket";
-import type { Question } from "@/lib/quiz/types";
+import type { MatchSummary, Question } from "@/lib/quiz/types";
+import { avatarEmoji } from "@/lib/quiz/types";
 
 function loadHostBootstrap(): {
   hostId: string;
@@ -24,7 +25,16 @@ function loadHostBootstrap(): {
   const hostId = getOrCreateId("quiz-host-id");
   const code = localStorage.getItem("quiz-host-code") ?? "";
   let questions = SAMPLE_QUESTIONS;
-  if (code) {
+
+  const bankKey = `quiz-host-questions:bank:${hostId}`;
+  const bankSaved = localStorage.getItem(bankKey);
+  if (bankSaved) {
+    try {
+      questions = JSON.parse(bankSaved) as Question[];
+    } catch {
+      /* ignore */
+    }
+  } else if (code) {
     const savedQs = localStorage.getItem(`quiz-host-questions:${code}`);
     if (savedQs) {
       try {
@@ -37,6 +47,13 @@ function loadHostBootstrap(): {
   return { hostId, code, questions };
 }
 
+function cacheQuestions(hostId: string, code: string, questions: Question[]) {
+  localStorage.setItem(`quiz-host-questions:bank:${hostId}`, JSON.stringify(questions));
+  if (code) {
+    localStorage.setItem(`quiz-host-questions:${code}`, JSON.stringify(questions));
+  }
+}
+
 export default function HostPage() {
   const { socket, connected, state } = useQuizSocket();
   const [boot] = useState(loadHostBootstrap);
@@ -45,7 +62,30 @@ export default function HostPage() {
   const [questions, setQuestions] = useState<Question[]>(boot.questions);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [matches, setMatches] = useState<MatchSummary[]>([]);
   const rejoinedRef = useRef(false);
+  const bankLoadedRef = useRef(false);
+  const matchesLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (!connected || !hostId || bankLoadedRef.current) return;
+    if (!socket.current) return;
+    bankLoadedRef.current = true;
+    socket.current.emit("host:loadBank", { hostId }, (res) => {
+      if (!res?.ok || !res.questions?.length) return;
+      setQuestions(res.questions);
+      cacheQuestions(hostId, code, res.questions);
+    });
+  }, [connected, hostId, code, socket]);
+
+  useEffect(() => {
+    if (!connected || !hostId || matchesLoadedRef.current) return;
+    if (!socket.current) return;
+    matchesLoadedRef.current = true;
+    socket.current.emit("host:listMatches", { hostId }, (res) => {
+      if (res?.ok) setMatches(res.matches);
+    });
+  }, [connected, hostId, socket]);
 
   useEffect(() => {
     if (!connected || !code || !hostId || rejoinedRef.current) return;
@@ -64,28 +104,43 @@ export default function HostPage() {
     );
   }, [connected, code, hostId, socket]);
 
+  useEffect(() => {
+    if (!hostId || !questions.length) return;
+    localStorage.setItem(
+      `quiz-host-questions:bank:${hostId}`,
+      JSON.stringify(questions)
+    );
+  }, [hostId, questions]);
+
+  useEffect(() => {
+    if (state?.phase !== "final" || !socket.current || !hostId) return;
+    socket.current.emit("host:listMatches", { hostId }, (res) => {
+      if (res?.ok) setMatches(res.matches);
+    });
+  }, [state?.phase, hostId, socket]);
+
+  function refreshMatches() {
+    if (!socket.current || !hostId) return;
+    socket.current.emit("host:listMatches", { hostId }, (res) => {
+      if (res?.ok) setMatches(res.matches);
+    });
+  }
+
   function createRoom() {
     if (!socket.current || !hostId) return;
     setBusy(true);
     setError("");
-    socket.current.emit(
-      "room:create",
-      { hostId, questions },
-      (res) => {
-        setBusy(false);
-        if (!res?.ok) {
-          setError(res?.error ?? "建房失敗");
-          return;
-        }
-        setCode(res.code);
-        localStorage.setItem("quiz-host-code", res.code);
-        localStorage.setItem(
-          `quiz-host-questions:${res.code}`,
-          JSON.stringify(questions)
-        );
-        rejoinedRef.current = true;
+    socket.current.emit("room:create", { hostId, questions }, (res) => {
+      setBusy(false);
+      if (!res?.ok) {
+        setError(res?.error ?? "建房失敗");
+        return;
       }
-    );
+      setCode(res.code);
+      localStorage.setItem("quiz-host-code", res.code);
+      cacheQuestions(hostId, res.code, questions);
+      rejoinedRef.current = true;
+    });
   }
 
   function saveQuestions() {
@@ -100,10 +155,7 @@ export default function HostPage() {
           setError(res?.error ?? "儲存失敗");
           return;
         }
-        localStorage.setItem(
-          `quiz-host-questions:${code}`,
-          JSON.stringify(questions)
-        );
+        cacheQuestions(hostId, code, questions);
       }
     );
   }
@@ -126,10 +178,7 @@ export default function HostPage() {
       setError(saveRes.error);
       return;
     }
-    localStorage.setItem(
-      `quiz-host-questions:${code}`,
-      JSON.stringify(questions)
-    );
+    cacheQuestions(hostId, code, questions);
     socket.current.emit("host:start", { code, hostId }, (res) => {
       setBusy(false);
       if (!res?.ok) setError(res?.error ?? "開始失敗");
@@ -141,6 +190,7 @@ export default function HostPage() {
     setError("");
     socket.current.emit(event, { code, hostId }, (res) => {
       if (!res?.ok) setError(res?.error ?? "操作失敗");
+      if (event === "host:next") refreshMatches();
     });
   }
 
@@ -192,7 +242,7 @@ export default function HostPage() {
       {!code && (
         <section className="rounded-3xl bg-black/30 p-6 ring-1 ring-white/10">
           <p className="mb-4 text-white/70">
-            編輯題庫後建立房間，挑戰者用房號加入（最多 20 人）。
+            編輯題庫後建立房間，挑戰者用房號加入（最多 20 人）。題庫會存到伺服器，重部署後仍可載入。
           </p>
           <QuestionEditor questions={questions} onChange={setQuestions} />
           <button
@@ -203,6 +253,52 @@ export default function HostPage() {
           >
             建立房間
           </button>
+        </section>
+      )}
+
+      {matches.length > 0 && (
+        <section className="rounded-3xl bg-black/30 p-5 ring-1 ring-white/10">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 className="font-display text-lg text-amber-200">近期比賽</h2>
+            <button
+              type="button"
+              onClick={refreshMatches}
+              className="text-xs text-white/50 hover:text-white/80"
+            >
+              重新整理
+            </button>
+          </div>
+          <ul className="space-y-3">
+            {matches.map((m) => {
+              const top = m.leaderboard.slice(0, 3);
+              const when = new Date(m.finishedAt).toLocaleString("zh-TW", {
+                month: "numeric",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              return (
+                <li
+                  key={m.id}
+                  className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm"
+                >
+                  <div>
+                    <span className="font-mono tracking-wider text-amber-100/90">{m.code}</span>
+                    <span className="ml-2 text-white/40">{when}</span>
+                    <span className="ml-2 text-white/40">{m.questionCount} 題</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-white/70">
+                    {top.map((p, i) => (
+                      <span key={p.id}>
+                        {i + 1}.{avatarEmoji(p.avatar)} {p.name} {p.score}
+                      </span>
+                    ))}
+                    {!top.length && <span className="text-white/40">無玩家</span>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       )}
 

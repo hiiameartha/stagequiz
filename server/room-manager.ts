@@ -23,6 +23,16 @@ export type Room = {
   timer: ReturnType<typeof setTimeout> | null;
 };
 
+export type RoomSnapshot = {
+  code: string;
+  hostId: string;
+  phase: Phase;
+  currentIndex: number;
+  questionEndsAt: number | null;
+  questions: Question[];
+  players: Player[];
+};
+
 function generateCode(): string {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const bytes = randomBytes(6);
@@ -81,6 +91,45 @@ export class RoomManager {
 
   get(code: string): Room | undefined {
     return this.rooms.get(code.toUpperCase());
+  }
+
+  toSnapshot(room: Room): RoomSnapshot {
+    return {
+      code: room.code,
+      hostId: room.hostId,
+      phase: room.phase,
+      currentIndex: room.currentIndex,
+      questionEndsAt: room.questionEndsAt,
+      questions: room.questions.map((q) => ({ ...q })),
+      players: room.players.map((p) => ({
+        ...p,
+        answers: { ...p.answers },
+        connected: false,
+      })),
+    };
+  }
+
+  hydrate(snapshot: RoomSnapshot): Room {
+    const code = snapshot.code.toUpperCase();
+    const existing = this.rooms.get(code);
+    if (existing?.timer) clearTimeout(existing.timer);
+
+    const room: Room = {
+      code,
+      hostId: snapshot.hostId,
+      phase: snapshot.phase,
+      currentIndex: snapshot.currentIndex,
+      questionEndsAt: snapshot.questionEndsAt,
+      questions: snapshot.questions.map((q) => ({ ...q })),
+      players: snapshot.players.map((p) => ({
+        ...p,
+        answers: { ...p.answers },
+        connected: false,
+      })),
+      timer: null,
+    };
+    this.rooms.set(code, room);
+    return room;
   }
 
   delete(code: string) {

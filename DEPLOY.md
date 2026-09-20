@@ -14,15 +14,36 @@ StageQuiz 依賴 **Socket.io 長連線**（房間、倒數、同步公布）。
 
 ---
 
-## 本機（你剛剛的錯誤）
-
-請進專案目錄再 build／dev（`Workspace` 根目錄沒有 `package.json`）：
+## 本機
 
 ```bash
 cd /Users/eartha/Workspace/stagequiz
+npm install
+cp .env.example .env   # 可選：填 DATABASE_URL
+npm run db:push        # 有 DATABASE_URL 時建立資料表
 npm run build
 npm run dev
 ```
+
+未設定 `DATABASE_URL` 時仍可玩，但房間／題庫只在記憶體，重啟後消失。
+
+---
+
+## Postgres 持久化（建議）
+
+在 **跑 Socket 的服務**（方案 A 本體，或方案 B 的 realtime）設定：
+
+1. 建立 Postgres（Railway Postgres／Neon／Supabase 任一）
+2. 環境變數 `DATABASE_URL=postgres://...`
+3. 部署前或本機執行一次：`npm run db:push`
+
+啟用後會持久化：
+
+- Host 題庫（依瀏覽器 `quiz-host-id`）
+- 進行中房間（重啟後可 rejoin 恢復進度）
+- 比賽結束後的歷史排行（控場台「近期比賽」）
+
+**Vercel 前端不需要** `DATABASE_URL`（歷史與房間都經 Socket／realtime 寫讀）。
 
 ---
 
@@ -33,6 +54,7 @@ npm run dev
 - **Build**：`npm install && npm run build`
 - **Start**：`npm start`（`server/index.ts` = Next + Socket）
 - 不需設定 `NEXT_PUBLIC_SOCKET_URL`
+- （建議）加 Postgres plugin，設 `DATABASE_URL`，並在 build 加 `npm run db:push` 或手動 push 一次
 
 部署後用手機開同一網址 `/join`，Host 用 `/host`，走完一場即可驗證。
 
@@ -43,9 +65,10 @@ npm run dev
 ### 1) 部署 Realtime（Railway / Render）
 
 - **Start command**：`npm run start:realtime`
-- **Build**：`npm install`（可不跑 next build）
+- **Build**：`npm install`（可不跑 next build；若用 DB：`npm install && npm run db:push`）
 - 環境變數：
   - `CORS_ORIGIN` = 你的 Vercel 網址，例如 `https://stagequiz.vercel.app`（也可先用 `*`）
+  - `DATABASE_URL` = Postgres 連線字串（建議）
   - `PORT` 由平台自動注入
 
 記下 Realtime 公開網址，例如 `https://stagequiz-realtime.up.railway.app`。
@@ -86,4 +109,5 @@ npm run realtime
 |------|------|------|
 | `NEXT_PUBLIC_SOCKET_URL` | Vercel / 拆分本機 | Socket 伺服器根網址 |
 | `CORS_ORIGIN` | Realtime | 允許的前端 origin |
+| `DATABASE_URL` | 跑 Socket 的服務 | Postgres；未設則純記憶體 |
 | `PORT` | 平台 | HTTP listen port |

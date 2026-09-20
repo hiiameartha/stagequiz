@@ -2,6 +2,7 @@
  * All-in-one Next.js + Socket.io (local / Railway mono deploy).
  * For Vercel: use Next on Vercel + `server/realtime.ts` elsewhere.
  */
+import "dotenv/config";
 import { createServer } from "http";
 import { parse } from "url";
 import next from "next";

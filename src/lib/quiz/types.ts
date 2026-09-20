@@ -121,6 +121,14 @@ export function isAvatarId(v: string): v is AvatarId {
   return AVATARS.some((a) => a.id === v);
 }
 
+export type MatchSummary = {
+  id: string;
+  code: string;
+  finishedAt: string;
+  questionCount: number;
+  leaderboard: Array<{ id: string; name: string; avatar: AvatarId; score: number }>;
+};
+
 export type ClientToServerEvents = {
   "room:create": (
     payload: { hostId: string; questions?: Question[] },
@@ -137,6 +145,20 @@ export type ClientToServerEvents = {
   "host:setQuestions": (
     payload: { code: string; hostId: string; questions: Question[] },
     ack?: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  "host:loadBank": (
+    payload: { hostId: string },
+    ack?: (
+      res:
+        | { ok: true; questions: Question[] | null }
+        | { ok: false; error: string }
+    ) => void
+  ) => void;
+  "host:listMatches": (
+    payload: { hostId: string },
+    ack?: (
+      res: { ok: true; matches: MatchSummary[] } | { ok: false; error: string }
+    ) => void
   ) => void;
   "host:start": (
     payload: { code: string; hostId: string },

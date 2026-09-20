@@ -2,6 +2,7 @@
  * Standalone Socket.io realtime server for Vercel (frontend) + Railway/Render (this).
  * Local: npm run realtime
  */
+import "dotenv/config";
 import { createServer } from "http";
 import { attachQuizSocket } from "./attach-socket";
 
