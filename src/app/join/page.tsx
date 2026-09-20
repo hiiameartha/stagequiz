@@ -34,9 +34,10 @@ function AnsweringPanel({
   const [selected, setSelected] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const q = state.currentQuestion!;
+  const waitingForMusic = state.questionEndsAt == null;
 
   function submit(choice: number) {
-    if (!socket.current || submitted) return;
+    if (!socket.current || submitted || waitingForMusic) return;
     setSelected(choice);
     socket.current.emit(
       "answer:submit",
@@ -62,10 +63,17 @@ function AnsweringPanel({
           </p>
           <h2 className="mt-1 font-display text-xl text-amber-50">{q.text}</h2>
         </div>
-        <Timer endsAt={state.questionEndsAt} />
+        <Timer
+          endsAt={state.questionEndsAt}
+          waitingLabel={waitingForMusic ? "等待播放" : undefined}
+        />
       </div>
       <QuestionMedia media={q.media} playAudio={false} />
-      {submitted || state.players.find((p) => p.id === playerId)?.hasAnswered ? (
+      {waitingForMusic ? (
+        <p className="animate-pulse-soft rounded-2xl bg-white/5 p-4 text-center text-white/60 ring-1 ring-white/10">
+          等待 Host 播放音樂後開始計時作答…
+        </p>
+      ) : submitted || state.players.find((p) => p.id === playerId)?.hasAnswered ? (
         <p className="animate-pop rounded-2xl bg-emerald-500/10 p-4 text-center text-emerald-200 ring-1 ring-emerald-400/30">
           已提交，等待其他人…
         </p>
@@ -81,31 +89,32 @@ function JoinInner() {
   const params = useSearchParams();
   const { socket, connected, state } = useQuizSocket();
 
-  const [playerId] = useState(() =>
-    typeof window === "undefined" ? "" : getOrCreateId("quiz-player-id")
-  );
-  const [code, setCode] = useState(() => {
-    if (typeof window === "undefined") return params.get("code")?.toUpperCase() ?? "";
-    const fromUrl = params.get("code")?.toUpperCase();
-    if (fromUrl) return fromUrl;
-    return localStorage.getItem("quiz-player-code") ?? "";
-  });
-  const [name, setName] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("quiz-player-name") ?? "";
-  });
-  const [avatar, setAvatar] = useState<AvatarId>(() => {
-    if (typeof window === "undefined") return "fox";
-    const saved = localStorage.getItem("quiz-player-avatar");
-    return saved && isAvatarId(saved) ? saved : "fox";
-  });
+  // SSR 與首屏一致；localStorage 延後到 mount
+  const [playerId, setPlayerId] = useState("");
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState<AvatarId>("fox");
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState("");
   const [lastChoice, setLastChoice] = useState<number | null>(null);
   const rejoinedRef = useRef(false);
 
   useEffect(() => {
-    if (!connected || !playerId || rejoinedRef.current) return;
+    const id = getOrCreateId("quiz-player-id");
+    const fromUrl = params.get("code")?.toUpperCase() ?? "";
+    const savedCode = fromUrl || localStorage.getItem("quiz-player-code") || "";
+    const savedName = localStorage.getItem("quiz-player-name") ?? "";
+    const savedAvatar = localStorage.getItem("quiz-player-avatar");
+    setPlayerId(id);
+    setCode(savedCode);
+    setName(savedName);
+    if (savedAvatar && isAvatarId(savedAvatar)) setAvatar(savedAvatar);
+    setBootstrapped(true);
+  }, [params]);
+
+  useEffect(() => {
+    if (!bootstrapped || !connected || !playerId || rejoinedRef.current) return;
     const savedCode = localStorage.getItem("quiz-player-code");
     if (!savedCode || !socket.current) return;
     rejoinedRef.current = true;
@@ -122,7 +131,7 @@ function JoinInner() {
         }
       }
     );
-  }, [connected, playerId, socket]);
+  }, [bootstrapped, connected, playerId, socket]);
 
   function join() {
     if (!socket.current || !playerId) return;

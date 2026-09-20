@@ -6,6 +6,7 @@ import { AvatarBadge } from "@/components/Avatar";
 import { Leaderboard, RevealBoard } from "@/components/Leaderboard";
 import { OptionGrid } from "@/components/OptionGrid";
 import { QuestionMedia } from "@/components/QuestionMedia";
+import { AnswerMediaPopup } from "@/components/AnswerMediaPopup";
 import { RankingChart } from "@/components/RankingChart";
 import { Timer } from "@/components/Timer";
 import { getOrCreateId, useQuizSocket } from "@/lib/socket";
@@ -17,19 +18,59 @@ function DisplayInner() {
     typeof window === "undefined" ? "" : getOrCreateId("quiz-host-id")
   );
   const codeParam = params.get("code") || "";
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const rejoinedRef = useRef(false);
 
   useEffect(() => {
     if (!connected || !hostId || rejoinedRef.current) return;
-    const code = codeParam || localStorage.getItem("quiz-host-code") || "";
-    if (!code || !socket.current) return;
+    const roomCode = codeParam || localStorage.getItem("quiz-host-code") || "";
+    if (!roomCode || !socket.current) return;
     rejoinedRef.current = true;
     socket.current.emit("room:rejoin", {
-      code,
+      code: roomCode,
       playerId: hostId,
       role: "host",
     });
   }, [connected, hostId, codeParam, socket]);
+
+  const code =
+    codeParam ||
+    (typeof window !== "undefined" ? localStorage.getItem("quiz-host-code") || "" : "");
+
+  function startRoundTimer() {
+    if (!socket.current || !hostId) return;
+    const roomCode = state?.code || code;
+    if (!roomCode || state?.questionEndsAt != null) return;
+    socket.current.emit("host:startTimer", { code: roomCode, hostId });
+  }
+
+  function startGame() {
+    if (!socket.current || !hostId) return;
+    const roomCode = state?.code || code;
+    if (!roomCode) return;
+    setBusy(true);
+    setError("");
+    socket.current.emit("host:start", { code: roomCode, hostId }, (res) => {
+      setBusy(false);
+      if (!res?.ok) setError(res?.error ?? "開始失敗");
+    });
+  }
+
+  function hostAction(event: "host:next" | "host:forceReveal") {
+    if (!socket.current || !hostId) return;
+    const roomCode = state?.code || code;
+    if (!roomCode) return;
+    setError("");
+    socket.current.emit(event, { code: roomCode, hostId }, (res) => {
+      if (!res?.ok) setError(res?.error ?? "操作失敗");
+    });
+  }
+
+  const continueLabel =
+    state && state.currentIndex + 1 >= state.questionCount
+      ? "看最終名次"
+      : "下一題";
 
   if (!state) {
     return (
@@ -38,6 +79,9 @@ function DisplayInner() {
       </main>
     );
   }
+
+  const waitingForMusic =
+    state.phase === "answering" && state.questionEndsAt == null;
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-8 px-6 py-10">
@@ -61,6 +105,12 @@ function DisplayInner() {
         </div>
       </header>
 
+      {error && (
+        <p className="rounded-2xl bg-rose-500/15 px-4 py-3 text-rose-200 ring-1 ring-rose-400/30">
+          {error}
+        </p>
+      )}
+
       {state.phase === "lobby" && (
         <div className="grid gap-6 md:grid-cols-2">
           <div className="animate-fade-up rounded-3xl bg-black/30 p-8 ring-1 ring-white/10">
@@ -72,6 +122,14 @@ function DisplayInner() {
               {state.playerCount} / {state.maxPlayers} 人
             </p>
             <p className="mt-2 text-white/40">共 {state.questionCount} 題（內容保密）</p>
+            <button
+              type="button"
+              disabled={busy || !connected || state.playerCount < 1}
+              onClick={startGame}
+              className="mt-8 rounded-2xl bg-amber-400 px-8 py-4 font-display text-2xl text-ink hover:bg-amber-300 disabled:opacity-40"
+            >
+              開始競賽
+            </button>
           </div>
           <div className="animate-fade-up space-y-3" style={{ animationDelay: "80ms" }}>
             <h3 className="font-display text-lg text-amber-200">動物小隊</h3>
@@ -102,10 +160,18 @@ function DisplayInner() {
                 {state.currentQuestion.text}
               </h2>
               {state.phase === "answering" && (
-                <Timer endsAt={state.questionEndsAt} />
+                <Timer
+                  endsAt={state.questionEndsAt}
+                  waitingLabel={waitingForMusic ? "等待播放" : undefined}
+                />
               )}
             </div>
-            <QuestionMedia media={state.currentQuestion.media} large playAudio />
+            <QuestionMedia
+              media={state.currentQuestion.media}
+              large
+              playAudio={state.phase === "answering"}
+              onPlayStart={startRoundTimer}
+            />
             <OptionGrid
               options={state.currentQuestion.options}
               correctIndex={state.currentQuestion.correctIndex}
@@ -114,18 +180,45 @@ function DisplayInner() {
               large
             />
             {state.phase === "answering" && (
-              <p className="animate-pulse-soft text-center text-white/50">
-                已交卷 {state.answeredCount}/{state.playerCount}
-              </p>
+              <div className="flex flex-col items-center gap-3">
+                <p className="animate-pulse-soft text-center text-white/50">
+                  已交卷 {state.answeredCount}/{state.playerCount}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => hostAction("host:forceReveal")}
+                  className="rounded-xl bg-rose-400/90 px-5 py-2 font-display text-white"
+                >
+                  提前公布
+                </button>
+              </div>
             )}
             {state.phase === "reveal" && (
               <>
                 <RevealBoard state={state} />
                 <Leaderboard state={state} />
+                <div className="flex justify-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => hostAction("host:next")}
+                    className="rounded-2xl bg-amber-400 px-8 py-3 font-display text-xl text-ink hover:bg-amber-300"
+                  >
+                    {continueLabel}
+                  </button>
+                </div>
               </>
             )}
           </div>
         )}
+
+      {state.phase === "reveal" && state.currentQuestion && (
+        <AnswerMediaPopup
+          media={state.currentQuestion.media}
+          active
+          onContinue={() => hostAction("host:next")}
+          continueLabel={continueLabel}
+        />
+      )}
 
       {state.phase === "final" && (
         <div className="rounded-3xl bg-black/35 p-8 ring-1 ring-amber-300/40">

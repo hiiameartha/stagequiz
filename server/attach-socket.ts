@@ -81,11 +81,8 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
   function restoreAnsweringTimer(room: Room) {
     if (room.phase !== "answering") return;
     const endsAt = room.questionEndsAt;
-    if (endsAt == null) {
-      rooms.reveal(room);
-      void persistRoom(room);
-      return;
-    }
+    // 音樂題尚未播放：等 Host 按播放
+    if (endsAt == null) return;
     const remaining = endsAt - Date.now();
     if (remaining <= 0) {
       rooms.reveal(room);
@@ -310,6 +307,27 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
       }
       revealAndEmit(room.code);
       ack?.({ ok: true });
+    });
+
+    socket.on("host:startTimer", async (payload, ack) => {
+      await ensureRoom(payload.code);
+      const room = rooms.get(payload.code);
+      if (!room) {
+        ack?.({ ok: false, error: "找不到房間" });
+        return;
+      }
+      if (room.hostId !== payload.hostId) {
+        ack?.({ ok: false, error: "無權限" });
+        return;
+      }
+      const result = rooms.armQuestionTimer(room, () => revealAndEmit(room.code));
+      if (!result.ok) {
+        ack?.({ ok: false, error: result.error });
+        return;
+      }
+      await persistRoom(result.room);
+      ack?.({ ok: true });
+      if (!result.already) emitState(result.room.code);
     });
 
     socket.on("answer:submit", async (payload, ack) => {

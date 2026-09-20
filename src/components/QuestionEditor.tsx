@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { QuestionMedia } from "@/components/QuestionMedia";
+import { parseYouTubeUrl } from "@/lib/quiz/youtube";
 import type { MediaType, Question } from "@/lib/quiz/types";
 
 function emptyQuestion(): Question {
@@ -139,7 +141,9 @@ export function QuestionEditor({ questions, onChange, disabled }: Props) {
             </div>
 
             <div className="space-y-2 rounded-xl bg-white/5 p-3">
-              <p className="text-xs text-white/50">媒體（選填）— 圖片或音訊 URL</p>
+              <p className="text-xs text-white/50">
+                媒體（選填）— 圖片、音訊檔，或 YouTube（猜歌：只播聲音、不顯示畫面）
+              </p>
               <div className="flex flex-wrap gap-2">
                 <select
                   disabled={disabled}
@@ -171,13 +175,20 @@ export function QuestionEditor({ questions, onChange, disabled }: Props) {
                   type="button"
                   disabled={disabled}
                   onClick={() => {
-                    if (!draft.url.trim()) {
+                    const url = draft.url.trim();
+                    if (!url) {
                       update(qi, { media: undefined });
                       return;
                     }
-                    update(qi, {
-                      media: { type: draft.type, url: draft.url.trim() },
-                    });
+                    const isYt = Boolean(parseYouTubeUrl(url));
+                    const type: MediaType = isYt ? "audio" : draft.type;
+                    if (isYt && draft.type !== "audio") {
+                      setMediaDraft((m) => ({
+                        ...m,
+                        [q.id]: { type: "audio", url },
+                      }));
+                    }
+                    update(qi, { media: { type, url } });
                   }}
                   className="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15"
                 >
@@ -201,9 +212,12 @@ export function QuestionEditor({ questions, onChange, disabled }: Props) {
                 )}
               </div>
               {q.media && (
-                <p className="truncate text-xs text-amber-200/70">
-                  已套用 {q.media.type}: {q.media.url}
-                </p>
+                <div className="space-y-2 border-t border-white/10 pt-3">
+                  <p className="text-xs text-amber-200/80">
+                    預覽（確認能否正常顯示／播放）
+                  </p>
+                  <QuestionMedia key={q.media.url} media={q.media} playAudio />
+                </div>
               )}
             </div>
           </article>

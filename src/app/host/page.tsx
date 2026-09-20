@@ -9,46 +9,13 @@ import { QuestionEditor } from "@/components/QuestionEditor";
 import { QuestionMedia } from "@/components/QuestionMedia";
 import { RankingChart } from "@/components/RankingChart";
 import { Timer } from "@/components/Timer";
-import { SAMPLE_QUESTIONS } from "@/lib/quiz/sample-questions";
+import { AnswerMediaPopup } from "@/components/AnswerMediaPopup";
 import { getOrCreateId, useQuizSocket } from "@/lib/socket";
+import { SAMPLE_QUESTIONS } from "@/lib/quiz/sample-questions";
 import type { MatchSummary, Question } from "@/lib/quiz/types";
 import { avatarEmoji } from "@/lib/quiz/types";
 
 const SHARED_BANK_CACHE_KEY = "quiz-host-questions:bank:shared";
-
-function loadHostBootstrap(): {
-  hostId: string;
-  code: string;
-  questions: Question[];
-} {
-  if (typeof window === "undefined") {
-    return { hostId: "", code: "", questions: SAMPLE_QUESTIONS };
-  }
-  const hostId = getOrCreateId("quiz-host-id");
-  const code = localStorage.getItem("quiz-host-code") ?? "";
-  let questions = SAMPLE_QUESTIONS;
-
-  const bankSaved =
-    localStorage.getItem(SHARED_BANK_CACHE_KEY) ??
-    localStorage.getItem(`quiz-host-questions:bank:${hostId}`);
-  if (bankSaved) {
-    try {
-      questions = JSON.parse(bankSaved) as Question[];
-    } catch {
-      /* ignore */
-    }
-  } else if (code) {
-    const savedQs = localStorage.getItem(`quiz-host-questions:${code}`);
-    if (savedQs) {
-      try {
-        questions = JSON.parse(savedQs) as Question[];
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-  return { hostId, code, questions };
-}
 
 function cacheQuestions(code: string, questions: Question[]) {
   localStorage.setItem(SHARED_BANK_CACHE_KEY, JSON.stringify(questions));
@@ -57,12 +24,37 @@ function cacheQuestions(code: string, questions: Question[]) {
   }
 }
 
+function readCachedQuestions(hostId: string, code: string): Question[] | null {
+  const bankSaved =
+    localStorage.getItem(SHARED_BANK_CACHE_KEY) ??
+    localStorage.getItem(`quiz-host-questions:bank:${hostId}`);
+  if (bankSaved) {
+    try {
+      return JSON.parse(bankSaved) as Question[];
+    } catch {
+      /* ignore */
+    }
+  }
+  if (code) {
+    const savedQs = localStorage.getItem(`quiz-host-questions:${code}`);
+    if (savedQs) {
+      try {
+        return JSON.parse(savedQs) as Question[];
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return null;
+}
+
 export default function HostPage() {
   const { socket, connected, state } = useQuizSocket();
-  const [boot] = useState(loadHostBootstrap);
-  const [hostId] = useState(boot.hostId);
-  const [code, setCode] = useState(boot.code);
-  const [questions, setQuestions] = useState<Question[]>(boot.questions);
+  // SSR 與首屏必須一致；localStorage / hostId 延後到 mount 再讀
+  const [hostId, setHostId] = useState("");
+  const [code, setCode] = useState("");
+  const [questions, setQuestions] = useState<Question[]>(SAMPLE_QUESTIONS);
+  const [bootstrapped, setBootstrapped] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saveHint, setSaveHint] = useState("");
@@ -72,7 +64,17 @@ export default function HostPage() {
   const matchesLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!connected || !hostId || bankLoadedRef.current) return;
+    const id = getOrCreateId("quiz-host-id");
+    const savedCode = localStorage.getItem("quiz-host-code") ?? "";
+    const cached = readCachedQuestions(id, savedCode);
+    setHostId(id);
+    setCode(savedCode);
+    if (cached?.length) setQuestions(cached);
+    setBootstrapped(true);
+  }, []);
+
+  useEffect(() => {
+    if (!bootstrapped || !connected || !hostId || bankLoadedRef.current) return;
     if (!socket.current) return;
     bankLoadedRef.current = true;
     socket.current.emit("host:loadBank", { hostId }, (res) => {
@@ -80,19 +82,19 @@ export default function HostPage() {
       setQuestions(res.questions);
       cacheQuestions(code, res.questions);
     });
-  }, [connected, hostId, code, socket]);
+  }, [bootstrapped, connected, hostId, code, socket]);
 
   useEffect(() => {
-    if (!connected || !hostId || matchesLoadedRef.current) return;
+    if (!bootstrapped || !connected || !hostId || matchesLoadedRef.current) return;
     if (!socket.current) return;
     matchesLoadedRef.current = true;
     socket.current.emit("host:listMatches", { hostId }, (res) => {
       if (res?.ok) setMatches(res.matches);
     });
-  }, [connected, hostId, socket]);
+  }, [bootstrapped, connected, hostId, socket]);
 
   useEffect(() => {
-    if (!connected || !code || !hostId || rejoinedRef.current) return;
+    if (!bootstrapped || !connected || !code || !hostId || rejoinedRef.current) return;
     if (!socket.current) return;
     rejoinedRef.current = true;
     socket.current.emit(
@@ -106,12 +108,12 @@ export default function HostPage() {
         }
       }
     );
-  }, [connected, code, hostId, socket]);
+  }, [bootstrapped, connected, code, hostId, socket]);
 
   useEffect(() => {
-    if (!questions.length) return;
+    if (!bootstrapped || !questions.length) return;
     localStorage.setItem(SHARED_BANK_CACHE_KEY, JSON.stringify(questions));
-  }, [questions]);
+  }, [bootstrapped, questions]);
 
   useEffect(() => {
     if (state?.phase !== "final" || !socket.current || !hostId) return;
@@ -125,6 +127,14 @@ export default function HostPage() {
     socket.current.emit("host:listMatches", { hostId }, (res) => {
       if (res?.ok) setMatches(res.matches);
     });
+  }
+
+  function leaveRoom() {
+    localStorage.removeItem("quiz-host-code");
+    setCode("");
+    setError("");
+    setSaveHint("");
+    rejoinedRef.current = false;
   }
 
   function createRoom() {
@@ -189,31 +199,6 @@ export default function HostPage() {
     );
   }
 
-  async function startGame() {
-    if (!socket.current || !code || !hostId) return;
-    setError("");
-    setBusy(true);
-    const saveRes = await new Promise<{ ok: true } | { ok: false; error: string }>(
-      (resolve) => {
-        socket.current!.emit(
-          "host:setQuestions",
-          { code, hostId, questions },
-          (res) => resolve(res ?? { ok: false, error: "儲存失敗" })
-        );
-      }
-    );
-    if (!saveRes.ok) {
-      setBusy(false);
-      setError(saveRes.error);
-      return;
-    }
-    cacheQuestions(code, questions);
-    socket.current.emit("host:start", { code, hostId }, (res) => {
-      setBusy(false);
-      if (!res?.ok) setError(res?.error ?? "開始失敗");
-    });
-  }
-
   function hostAction(event: "host:next" | "host:forceReveal") {
     if (!socket.current || !code || !hostId) return;
     setError("");
@@ -230,10 +215,17 @@ export default function HostPage() {
     });
   }
 
+  function startRoundTimer() {
+    if (!socket.current || !code || !hostId) return;
+    if (state?.questionEndsAt != null) return;
+    socket.current.emit("host:startTimer", { code, hostId });
+  }
+
   const inLobby = !state || state.phase === "lobby";
   const answering = state?.phase === "answering";
   const reveal = state?.phase === "reveal";
   const final = state?.phase === "final";
+  const waitingForMusic = Boolean(answering && state && state.questionEndsAt == null);
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8">
@@ -248,13 +240,22 @@ export default function HostPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           {code && (
-            <Link
-              href={`/host/display?code=${code}`}
-              target="_blank"
-              className="rounded-xl bg-white/10 px-4 py-2 text-sm ring-1 ring-white/15 hover:bg-white/15"
-            >
-              開啟展示屏
-            </Link>
+            <>
+              <button
+                type="button"
+                onClick={leaveRoom}
+                className="rounded-xl bg-white/10 px-4 py-2 text-sm ring-1 ring-white/15 hover:bg-white/15"
+              >
+                離開房間
+              </button>
+              <Link
+                href={`/host/display?code=${code}`}
+                target="_blank"
+                className="rounded-xl bg-white/10 px-4 py-2 text-sm ring-1 ring-white/15 hover:bg-white/15"
+              >
+                開啟展示屏
+              </Link>
+            </>
           )}
           <Link href="/" className="rounded-xl px-4 py-2 text-sm text-white/60 hover:text-white">
             回首頁
@@ -383,17 +384,12 @@ export default function HostPage() {
                     >
                       儲存題庫
                     </button>
-                    <button
-                      type="button"
-                      onClick={startGame}
-                      disabled={busy}
-                      className="rounded-xl bg-amber-400 px-4 py-2 font-display text-ink hover:bg-amber-300 disabled:opacity-40"
-                    >
-                      開始競賽
-                    </button>
                     {saveHint && (
                       <span className="text-sm text-emerald-300/90">{saveHint}</span>
                     )}
+                    <p className="w-full text-xs text-white/40">
+                      開始競賽請到展示屏操作。
+                    </p>
                   </>
                 )}
                 {answering && (
@@ -415,6 +411,20 @@ export default function HostPage() {
                       ? "看最終名次"
                       : "下一題"}
                   </button>
+                )}
+                {final && (
+                  <button
+                    type="button"
+                    onClick={leaveRoom}
+                    className="rounded-xl bg-amber-400 px-4 py-2 font-display text-ink hover:bg-amber-300"
+                  >
+                    返回編輯題庫
+                  </button>
+                )}
+                {!inLobby && !final && (
+                  <p className="w-full text-xs text-white/40">
+                    比賽進行中無法改題；要改題庫請按上方「離開房間」。
+                  </p>
                 )}
               </div>
             </div>
@@ -438,9 +448,18 @@ export default function HostPage() {
                       {state.currentQuestion.text}
                     </h2>
                   </div>
-                  {answering && <Timer endsAt={state.questionEndsAt} />}
+                  {answering && (
+                    <Timer
+                      endsAt={state.questionEndsAt}
+                      waitingLabel={waitingForMusic ? "等待播放" : undefined}
+                    />
+                  )}
                 </div>
-                <QuestionMedia media={state.currentQuestion.media} playAudio />
+                <QuestionMedia
+                  media={state.currentQuestion.media}
+                  playAudio={answering}
+                  onPlayStart={startRoundTimer}
+                />
                 <OptionGrid
                   options={state.currentQuestion.options}
                   correctIndex={state.currentQuestion.correctIndex}
@@ -450,6 +469,19 @@ export default function HostPage() {
                 />
                 {reveal && <RevealBoard state={state} />}
               </div>
+            )}
+
+            {reveal && state.currentQuestion && (
+              <AnswerMediaPopup
+                media={state.currentQuestion.media}
+                active={reveal}
+                onContinue={() => hostAction("host:next")}
+                continueLabel={
+                  state.currentIndex + 1 >= state.questionCount
+                    ? "看最終名次"
+                    : "下一題"
+                }
+              />
             )}
 
             {final && (
