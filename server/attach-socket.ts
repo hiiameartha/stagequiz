@@ -117,7 +117,7 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
         socket.data = { code: room.code, hostId: payload.hostId, role: "host" };
         socket.join(room.code);
         await persistRoom(room);
-        await saveQuestionBank(payload.hostId, questions);
+        await saveQuestionBank(questions);
         ack?.({ ok: true, code: room.code });
         emitState(room.code);
       } catch (e) {
@@ -168,14 +168,30 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
       emitState(result.room.code);
     });
 
-    socket.on("host:loadBank", async (payload, ack) => {
+    socket.on("host:loadBank", async (_payload, ack) => {
       try {
-        const questions = await loadQuestionBank(payload.hostId);
+        const questions = await loadQuestionBank();
         ack?.({ ok: true, questions });
       } catch (e) {
         ack?.({
           ok: false,
           error: e instanceof Error ? e.message : "載入題庫失敗",
+        });
+      }
+    });
+
+    socket.on("host:saveBank", async (payload, ack) => {
+      try {
+        if (!payload.questions?.length) {
+          ack?.({ ok: false, error: "至少需要一題" });
+          return;
+        }
+        await saveQuestionBank(payload.questions);
+        ack?.({ ok: true });
+      } catch (e) {
+        ack?.({
+          ok: false,
+          error: e instanceof Error ? e.message : "儲存題庫失敗",
         });
       }
     });
@@ -200,7 +216,7 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
         return;
       }
       await persistRoom(result.room);
-      await saveQuestionBank(payload.hostId, payload.questions);
+      await saveQuestionBank(payload.questions);
       ack?.({ ok: true });
       emitState(result.room.code);
     });

@@ -16,6 +16,7 @@ export type LeaderboardEntry = {
 };
 
 export const questionBanks = pgTable("question_banks", {
+  /** 固定為 shared：全站共用一份題庫 */
   hostId: text("host_id").primaryKey(),
   questions: jsonb("questions").$type<Question[]>().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -154,6 +154,10 @@ export type ClientToServerEvents = {
         | { ok: false; error: string }
     ) => void
   ) => void;
+  "host:saveBank": (
+    payload: { hostId: string; questions: Question[] },
+    ack?: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
   "host:listMatches": (
     payload: { hostId: string },
     ack?: (

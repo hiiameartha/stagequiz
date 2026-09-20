@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, ne } from "drizzle-orm";
 import type { Question } from "../../src/lib/quiz/types";
 import type { Room } from "../room-manager";
 import { getDb, isDbEnabled } from "./client";
@@ -9,6 +9,9 @@ import {
   type LeaderboardEntry,
   type RoomSnapshot,
 } from "./schema";
+
+/** 全站共用題庫（不依瀏覽器 hostId 分開） */
+export const SHARED_BANK_ID = "shared";
 
 function roomToSnapshot(room: Room): RoomSnapshot {
   return {
@@ -26,14 +29,14 @@ function roomToSnapshot(room: Room): RoomSnapshot {
   };
 }
 
-export async function saveQuestionBank(hostId: string, questions: Question[]) {
+export async function saveQuestionBank(questions: Question[]) {
   const db = getDb();
   if (!db) return;
   try {
     await db
       .insert(questionBanks)
       .values({
-        hostId,
+        hostId: SHARED_BANK_ID,
         questions,
         updatedAt: new Date(),
       })
@@ -41,21 +44,35 @@ export async function saveQuestionBank(hostId: string, questions: Question[]) {
         target: questionBanks.hostId,
         set: { questions, updatedAt: new Date() },
       });
+    // 清掉舊的依 host 分開的列，避免 Table Editor 看起來像多份題庫
+    await db.delete(questionBanks).where(ne(questionBanks.hostId, SHARED_BANK_ID));
   } catch (e) {
     console.error("[db] saveQuestionBank failed", e);
   }
 }
 
-export async function loadQuestionBank(hostId: string): Promise<Question[] | null> {
+export async function loadQuestionBank(): Promise<Question[] | null> {
   const db = getDb();
   if (!db) return null;
   try {
-    const rows = await db
+    const shared = await db
       .select()
       .from(questionBanks)
-      .where(eq(questionBanks.hostId, hostId))
+      .where(eq(questionBanks.hostId, SHARED_BANK_ID))
       .limit(1);
-    return rows[0]?.questions ?? null;
+    if (shared[0]?.questions?.length) return shared[0].questions;
+
+    // 相容舊資料：取最近更新的一包，並遷移成 shared
+    const legacy = await db
+      .select()
+      .from(questionBanks)
+      .orderBy(desc(questionBanks.updatedAt))
+      .limit(1);
+    const questions = legacy[0]?.questions ?? null;
+    if (questions?.length) {
+      await saveQuestionBank(questions);
+    }
+    return questions;
   } catch (e) {
     console.error("[db] loadQuestionBank failed", e);
     return null;

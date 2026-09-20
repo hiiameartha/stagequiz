@@ -14,6 +14,8 @@ import { getOrCreateId, useQuizSocket } from "@/lib/socket";
 import type { MatchSummary, Question } from "@/lib/quiz/types";
 import { avatarEmoji } from "@/lib/quiz/types";
 
+const SHARED_BANK_CACHE_KEY = "quiz-host-questions:bank:shared";
+
 function loadHostBootstrap(): {
   hostId: string;
   code: string;
@@ -26,8 +28,9 @@ function loadHostBootstrap(): {
   const code = localStorage.getItem("quiz-host-code") ?? "";
   let questions = SAMPLE_QUESTIONS;
 
-  const bankKey = `quiz-host-questions:bank:${hostId}`;
-  const bankSaved = localStorage.getItem(bankKey);
+  const bankSaved =
+    localStorage.getItem(SHARED_BANK_CACHE_KEY) ??
+    localStorage.getItem(`quiz-host-questions:bank:${hostId}`);
   if (bankSaved) {
     try {
       questions = JSON.parse(bankSaved) as Question[];
@@ -47,8 +50,8 @@ function loadHostBootstrap(): {
   return { hostId, code, questions };
 }
 
-function cacheQuestions(hostId: string, code: string, questions: Question[]) {
-  localStorage.setItem(`quiz-host-questions:bank:${hostId}`, JSON.stringify(questions));
+function cacheQuestions(code: string, questions: Question[]) {
+  localStorage.setItem(SHARED_BANK_CACHE_KEY, JSON.stringify(questions));
   if (code) {
     localStorage.setItem(`quiz-host-questions:${code}`, JSON.stringify(questions));
   }
@@ -62,6 +65,7 @@ export default function HostPage() {
   const [questions, setQuestions] = useState<Question[]>(boot.questions);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saveHint, setSaveHint] = useState("");
   const [matches, setMatches] = useState<MatchSummary[]>([]);
   const rejoinedRef = useRef(false);
   const bankLoadedRef = useRef(false);
@@ -74,7 +78,7 @@ export default function HostPage() {
     socket.current.emit("host:loadBank", { hostId }, (res) => {
       if (!res?.ok || !res.questions?.length) return;
       setQuestions(res.questions);
-      cacheQuestions(hostId, code, res.questions);
+      cacheQuestions(code, res.questions);
     });
   }, [connected, hostId, code, socket]);
 
@@ -105,12 +109,9 @@ export default function HostPage() {
   }, [connected, code, hostId, socket]);
 
   useEffect(() => {
-    if (!hostId || !questions.length) return;
-    localStorage.setItem(
-      `quiz-host-questions:bank:${hostId}`,
-      JSON.stringify(questions)
-    );
-  }, [hostId, questions]);
+    if (!questions.length) return;
+    localStorage.setItem(SHARED_BANK_CACHE_KEY, JSON.stringify(questions));
+  }, [questions]);
 
   useEffect(() => {
     if (state?.phase !== "final" || !socket.current || !hostId) return;
@@ -138,24 +139,52 @@ export default function HostPage() {
       }
       setCode(res.code);
       localStorage.setItem("quiz-host-code", res.code);
-      cacheQuestions(hostId, res.code, questions);
+      cacheQuestions(res.code, questions);
       rejoinedRef.current = true;
     });
   }
 
   function saveQuestions() {
-    if (!socket.current || !code || !hostId) return;
+    if (!socket.current || !hostId) return;
+    if (!questions.length) {
+      setError("至少需要一題");
+      return;
+    }
     setBusy(true);
+    setError("");
+    setSaveHint("");
     socket.current.emit(
-      "host:setQuestions",
-      { code, hostId, questions },
-      (res) => {
-        setBusy(false);
+      "host:saveBank",
+      { hostId, questions },
+      async (res) => {
         if (!res?.ok) {
+          setBusy(false);
           setError(res?.error ?? "儲存失敗");
           return;
         }
-        cacheQuestions(hostId, code, questions);
+        cacheQuestions(code, questions);
+
+        // 若已在大廳房間，一併同步該場次題目
+        if (code && (!state || state.phase === "lobby")) {
+          const roomRes = await new Promise<
+            { ok: true } | { ok: false; error: string }
+          >((resolve) => {
+            socket.current!.emit(
+              "host:setQuestions",
+              { code, hostId, questions },
+              (r) => resolve(r ?? { ok: false, error: "同步房間失敗" })
+            );
+          });
+          setBusy(false);
+          if (!roomRes.ok) {
+            setError(roomRes.error);
+            return;
+          }
+        } else {
+          setBusy(false);
+        }
+        setSaveHint("題庫已存到雲端");
+        window.setTimeout(() => setSaveHint(""), 2500);
       }
     );
   }
@@ -178,7 +207,7 @@ export default function HostPage() {
       setError(saveRes.error);
       return;
     }
-    cacheQuestions(hostId, code, questions);
+    cacheQuestions(code, questions);
     socket.current.emit("host:start", { code, hostId }, (res) => {
       setBusy(false);
       if (!res?.ok) setError(res?.error ?? "開始失敗");
@@ -242,17 +271,28 @@ export default function HostPage() {
       {!code && (
         <section className="rounded-3xl bg-black/30 p-6 ring-1 ring-white/10">
           <p className="mb-4 text-white/70">
-            編輯題庫後建立房間，挑戰者用房號加入（最多 20 人）。題庫會存到伺服器，重部署後仍可載入。
+            題庫全站共用一份，可隨時存到雲端；之後再建立房間給挑戰者加入（最多 20 人）。
           </p>
           <QuestionEditor questions={questions} onChange={setQuestions} />
-          <button
-            type="button"
-            disabled={busy || !connected}
-            onClick={createRoom}
-            className="mt-6 rounded-2xl bg-amber-400 px-6 py-3 font-display text-lg text-ink hover:bg-amber-300 disabled:opacity-40"
-          >
-            建立房間
-          </button>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={busy || !connected}
+              onClick={saveQuestions}
+              className="rounded-2xl bg-white/10 px-6 py-3 text-sm ring-1 ring-white/15 hover:bg-white/15 disabled:opacity-40"
+            >
+              儲存題庫
+            </button>
+            <button
+              type="button"
+              disabled={busy || !connected}
+              onClick={createRoom}
+              className="rounded-2xl bg-amber-400 px-6 py-3 font-display text-lg text-ink hover:bg-amber-300 disabled:opacity-40"
+            >
+              建立房間
+            </button>
+            {saveHint && <span className="text-sm text-emerald-300/90">{saveHint}</span>}
+          </div>
         </section>
       )}
 
@@ -332,7 +372,7 @@ export default function HostPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap items-center gap-2">
                 {inLobby && (
                   <>
                     <button
@@ -351,6 +391,9 @@ export default function HostPage() {
                     >
                       開始競賽
                     </button>
+                    {saveHint && (
+                      <span className="text-sm text-emerald-300/90">{saveHint}</span>
+                    )}
                   </>
                 )}
                 {answering && (
