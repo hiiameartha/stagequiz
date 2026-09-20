@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
-import { Fraunces, Outfit } from "next/font/google";
+import { Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
 
-const display = Fraunces({
+const display = Fredoka({
   variable: "--font-display",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
 });
 
-const sans = Outfit({
+const sans = Nunito({
   variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -25,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-Hant" className={`${display.variable} ${sans.variable} h-full`}>
-      <body className="min-h-full flex flex-col font-sans antialiased text-amber-50">
+      <body className="min-h-full flex flex-col font-sans antialiased text-ink">
         {children}
       </body>
     </html>

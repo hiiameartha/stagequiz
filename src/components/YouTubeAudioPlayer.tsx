@@ -108,7 +108,6 @@ export function YouTubeAudioPlayer({ url, onPlayStart }: Props) {
             }
           },
           onStateChange: (e) => {
-            // 1 = playing, 2 = paused, 0 = ended
             if (cancelled) return;
             if (e.data === 1) setPlaying(true);
             if (e.data === 2 || e.data === 0) setPlaying(false);
@@ -130,7 +129,7 @@ export function YouTubeAudioPlayer({ url, onPlayStart }: Props) {
   }, [parsed?.id, parsed?.startSec, url]);
 
   if (!parsed) {
-    return <p className="text-sm text-rose-200">無法解析 YouTube 網址</p>;
+    return <p className="text-sm text-[#a33232]">無法解析 YouTube 網址</p>;
   }
 
   function play() {

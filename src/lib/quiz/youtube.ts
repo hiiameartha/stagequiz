@@ -9,11 +9,19 @@ export function parseYouTubeUrl(
 
     if (host === "youtu.be") {
       id = u.pathname.split("/").filter(Boolean)[0] ?? "";
-    } else if (host === "youtube.com" || host === "m.youtube.com" || host === "music.youtube.com") {
+    } else if (
+      host === "youtube.com" ||
+      host === "m.youtube.com" ||
+      host === "music.youtube.com"
+    ) {
       id = u.searchParams.get("v") ?? "";
       if (!id) {
         const parts = u.pathname.split("/").filter(Boolean);
-        if (parts[0] === "embed" || parts[0] === "shorts" || parts[0] === "live") {
+        if (
+          parts[0] === "embed" ||
+          parts[0] === "shorts" ||
+          parts[0] === "live"
+        ) {
           id = parts[1] ?? "";
         }
       }
@@ -35,9 +43,7 @@ function parseYouTubeTime(t: string): number {
   const m = t.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i);
   if (!m) return 0;
   return (
-    (Number(m[1] ?? 0) * 3600) +
-    (Number(m[2] ?? 0) * 60) +
-    Number(m[3] ?? 0)
+    Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0)
   );
 }
 

@@ -14,7 +14,6 @@ type Props = {
   disabled?: boolean;
   error?: string;
   onToggle: () => void;
-  /** 無障礙：播放／暫停按鈕標籤 */
   labelPlaying?: string;
   labelPaused?: string;
   labelLoading?: string;
@@ -97,15 +96,19 @@ export function EqualizerPlayControls({
 
   if (error) {
     return (
-      <div className="animate-fade-up rounded-2xl bg-black/30 p-5 ring-1 ring-white/10">
-        <p className="text-sm text-rose-200">{error}</p>
+      <div className="neu-panel p-5">
+        <p className="text-sm text-[#a33232]">{error}</p>
       </div>
     );
   }
 
   return (
     <div className="eq-player animate-fade-up">
-      <div className="eq-wave" aria-hidden data-playing={playing ? "true" : "false"}>
+      <div
+        className="eq-wave"
+        aria-hidden
+        data-playing={playing ? "true" : "false"}
+      >
         {BARS.map((i) => (
           <span
             key={i}

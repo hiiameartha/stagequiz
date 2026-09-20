@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EqualizerPlayControls } from "@/components/EqualizerPlayControls";
 import { YouTubeAudioPlayer } from "@/components/YouTubeAudioPlayer";
+import { Alert, Inset, Panel } from "@/components/ui";
 import { youtubeEmbedSrc } from "@/lib/quiz/youtube";
 import type { Media } from "@/lib/quiz/types";
 
@@ -67,6 +68,20 @@ function FileAudioPlayer({
   );
 }
 
+function ListeningHint() {
+  return (
+    <Inset className="animate-pulse-soft flex items-center gap-3 px-4 py-3">
+      <span className="text-2xl" aria-hidden>
+        🎵
+      </span>
+      <div>
+        <p className="font-display text-ink">請聽大螢幕播放的音樂</p>
+        <p className="text-sm text-muted">音訊由 Host 投影播放</p>
+      </div>
+    </Inset>
+  );
+}
+
 export function QuestionMedia({
   media,
   large,
@@ -80,19 +95,7 @@ export function QuestionMedia({
   const isYouTube = Boolean(media.url && youtubeEmbedSrc(media.url));
 
   if (isYouTube && media.url) {
-    if (!playAudio) {
-      return (
-        <div className="animate-pulse-soft flex items-center gap-3 rounded-2xl bg-violet-500/15 px-4 py-3 ring-1 ring-violet-300/30">
-          <span className="text-2xl" aria-hidden>
-            🎵
-          </span>
-          <div>
-            <p className="font-display text-violet-100">請聽大螢幕播放的音樂</p>
-            <p className="text-sm text-white/50">音訊由 Host 投影播放</p>
-          </div>
-        </div>
-      );
-    }
+    if (!playAudio) return <ListeningHint />;
     return <YouTubeAudioPlayer url={media.url} onPlayStart={onPlayStart} />;
   }
 
@@ -100,16 +103,17 @@ export function QuestionMedia({
     if (!media.url) return null;
     if (imgError) {
       return (
-        <div className="rounded-2xl bg-rose-500/10 px-4 py-3 text-sm text-rose-200 ring-1 ring-rose-400/30">
+        <Alert tone="error">
           圖片無法載入，請檢查網址是否正確、是否允許外部引用。
-        </div>
+        </Alert>
       );
     }
     return (
-      <div
-        className={`animate-fade-up overflow-hidden rounded-2xl bg-black/30 ring-1 ring-white/10 ${
+      <Panel
+        className={`animate-fade-up overflow-hidden ${
           large ? "max-h-[42vh]" : "max-h-56"
         }`}
+        padding="none"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -120,25 +124,13 @@ export function QuestionMedia({
           onError={() => setImgError(true)}
           onLoad={() => setImgError(false)}
         />
-      </div>
+      </Panel>
     );
   }
 
   if (media.type !== "audio") return null;
 
-  if (!playAudio || !media.url) {
-    return (
-      <div className="animate-pulse-soft flex items-center gap-3 rounded-2xl bg-violet-500/15 px-4 py-3 ring-1 ring-violet-300/30">
-        <span className="text-2xl" aria-hidden>
-          🎵
-        </span>
-        <div>
-          <p className="font-display text-violet-100">請聽大螢幕播放的音樂</p>
-          <p className="text-sm text-white/50">音訊由 Host 投影播放</p>
-        </div>
-      </div>
-    );
-  }
+  if (!playAudio || !media.url) return <ListeningHint />;
 
   return <FileAudioPlayer url={media.url} onPlayStart={onPlayStart} />;
 }
