@@ -1,6 +1,7 @@
 "use client";
 
 import { AvatarBadge } from "@/components/Avatar";
+import { Chip, Inset, Panel } from "@/components/ui";
 import { OPTION_LABELS, type RoomState } from "@/lib/quiz/types";
 
 export function Leaderboard({
@@ -13,32 +14,50 @@ export function Leaderboard({
   title?: string;
 }) {
   return (
-    <div className="animate-fade-up rounded-2xl bg-black/25 p-4 ring-1 ring-white/10">
-      <h3 className="mb-3 font-display text-lg text-amber-200">{title}</h3>
+    <Panel className="animate-fade-up" padding="sm">
+      <h3 className="mb-3 font-display text-lg text-ink">{title}</h3>
       <ol className="space-y-2">
         {state.leaderboard.map((p, i) => (
-          <li
-            key={p.id}
-            style={{ animationDelay: `${i * 40}ms` }}
-            className={`animate-fade-up flex items-center justify-between rounded-xl px-3 py-2 ${
-              p.id === highlightId ? "bg-amber-400/15 ring-1 ring-amber-300/40" : "bg-white/5"
-            }`}
-          >
-            <span className="flex min-w-0 items-center gap-3">
-              <span className="w-6 text-center font-display text-amber-300/80">
-                {i + 1}
-              </span>
-              <AvatarBadge avatar={p.avatar} size="sm" />
-              <span className="truncate">{p.name}</span>
-            </span>
-            <span className="tabular-nums text-white/80">{p.score}</span>
+          <li key={p.id} style={{ animationDelay: `${i * 40}ms` }}>
+            {p.id === highlightId ? (
+              <Inset className="animate-fade-up flex items-center justify-between px-3 py-2">
+                <LeaderRow rank={i + 1} avatar={p.avatar} name={p.name} score={p.score} />
+              </Inset>
+            ) : (
+              <Chip className="animate-fade-up flex items-center justify-between px-3 py-2">
+                <LeaderRow rank={i + 1} avatar={p.avatar} name={p.name} score={p.score} />
+              </Chip>
+            )}
           </li>
         ))}
         {!state.leaderboard.length && (
-          <li className="text-sm text-white/50">尚無挑戰者</li>
+          <li className="text-sm text-muted">尚無挑戰者</li>
         )}
       </ol>
-    </div>
+    </Panel>
+  );
+}
+
+function LeaderRow({
+  rank,
+  avatar,
+  name,
+  score,
+}: {
+  rank: number;
+  avatar: Parameters<typeof AvatarBadge>[0]["avatar"];
+  name: string;
+  score: number;
+}) {
+  return (
+    <>
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="w-6 text-center font-display text-ink">{rank}</span>
+        <AvatarBadge avatar={avatar} size="sm" />
+        <span className="truncate">{name}</span>
+      </span>
+      <span className="tabular-nums text-muted">{score}</span>
+    </>
   );
 }
 
@@ -48,15 +67,15 @@ export function RevealBoard({ state }: { state: RoomState }) {
 
   return (
     <div className="animate-fade-up space-y-4">
-      <div className="animate-pop rounded-2xl bg-emerald-500/10 p-4 ring-1 ring-emerald-400/30">
-        <p className="text-sm text-emerald-200/80">正解</p>
-        <p className="mt-1 font-display text-2xl text-emerald-100">
+      <div className="animate-pop rounded-2xl bg-gradient-to-br from-[#2f9e5f] to-[#1f7a47] p-4 text-white shadow-[6px_6px_14px_rgba(51,50,55,0.18)]">
+        <p className="text-sm text-white/85">正解</p>
+        <p className="mt-1 font-display text-2xl">
           {OPTION_LABELS[q.correctIndex ?? 0]} · {q.options[q.correctIndex ?? 0]}
         </p>
       </div>
-      <div className="overflow-hidden rounded-2xl ring-1 ring-white/10">
+      <Panel className="overflow-hidden" padding="none">
         <table className="w-full text-left text-sm">
-          <thead className="bg-white/5 text-white/60">
+          <thead className="text-muted">
             <tr>
               <th className="px-3 py-2 font-medium">挑戰者</th>
               <th className="px-3 py-2 font-medium">作答</th>
@@ -69,7 +88,7 @@ export function RevealBoard({ state }: { state: RoomState }) {
               <tr
                 key={r.playerId}
                 style={{ animationDelay: `${i * 50}ms` }}
-                className="animate-fade-up border-t border-white/5"
+                className="animate-fade-up border-t border-[rgba(51,50,55,0.08)]"
               >
                 <td className="px-3 py-2">
                   <span className="inline-flex items-center gap-2">
@@ -82,7 +101,7 @@ export function RevealBoard({ state }: { state: RoomState }) {
                     ? "—"
                     : `${OPTION_LABELS[r.choice]}${r.correct ? " ✓" : " ✗"}`}
                 </td>
-                <td className="px-3 py-2 tabular-nums text-amber-200">
+                <td className="px-3 py-2 tabular-nums font-semibold text-ink">
                   +{r.pointsEarned}
                 </td>
                 <td className="px-3 py-2 tabular-nums">{r.score}</td>
@@ -90,7 +109,7 @@ export function RevealBoard({ state }: { state: RoomState }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </Panel>
     </div>
   );
 }

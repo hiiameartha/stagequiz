@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { AvatarBadge, AvatarPicker } from "@/components/Avatar";
@@ -9,6 +8,16 @@ import { OptionGrid } from "@/components/OptionGrid";
 import { QuestionMedia } from "@/components/QuestionMedia";
 import { RankingChart } from "@/components/RankingChart";
 import { Timer } from "@/components/Timer";
+import {
+  AccentLabel,
+  Alert,
+  Button,
+  Chip,
+  Field,
+  FieldInput,
+  Inset,
+  Panel,
+} from "@/components/ui";
 import { getOrCreateId, useQuizSocket, type QuizSocket } from "@/lib/socket";
 import {
   isAvatarId,
@@ -57,18 +66,18 @@ function AnsweringPanel({
     <div className="animate-fade-up space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted">
             第 {state.currentIndex + 1} / {state.questionCount} 題
           </p>
-          <h2 className="mt-1 font-display text-xl text-amber-50">{q.text}</h2>
+          <h2 className="mt-1 font-display text-xl text-ink">{q.text}</h2>
         </div>
         <Timer endsAt={state.questionEndsAt} />
       </div>
       <QuestionMedia media={q.media} playAudio={false} />
       {submitted || state.players.find((p) => p.id === playerId)?.hasAnswered ? (
-        <p className="animate-pop rounded-2xl bg-emerald-500/10 p-4 text-center text-emerald-200 ring-1 ring-emerald-400/30">
+        <Alert tone="success" className="animate-pop p-4 text-center font-semibold">
           已提交，等待其他人…
-        </p>
+        </Alert>
       ) : (
         <OptionGrid options={q.options} selected={selected} onSelect={submit} />
       )}
@@ -81,28 +90,29 @@ function JoinInner() {
   const params = useSearchParams();
   const { socket, connected, state } = useQuizSocket();
 
-  const [playerId] = useState(() =>
-    typeof window === "undefined" ? "" : getOrCreateId("quiz-player-id")
+  const [playerId, setPlayerId] = useState("");
+  const [code, setCode] = useState(
+    () => params.get("code")?.toUpperCase() ?? ""
   );
-  const [code, setCode] = useState(() => {
-    if (typeof window === "undefined") return params.get("code")?.toUpperCase() ?? "";
-    const fromUrl = params.get("code")?.toUpperCase();
-    if (fromUrl) return fromUrl;
-    return localStorage.getItem("quiz-player-code") ?? "";
-  });
-  const [name, setName] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("quiz-player-name") ?? "";
-  });
-  const [avatar, setAvatar] = useState<AvatarId>(() => {
-    if (typeof window === "undefined") return "fox";
-    const saved = localStorage.getItem("quiz-player-avatar");
-    return saved && isAvatarId(saved) ? saved : "fox";
-  });
+  const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState<AvatarId>("fox");
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState("");
   const [lastChoice, setLastChoice] = useState<number | null>(null);
   const rejoinedRef = useRef(false);
+
+  useEffect(() => {
+    setPlayerId(getOrCreateId("quiz-player-id"));
+    const fromUrl = params.get("code")?.toUpperCase();
+    if (!fromUrl) {
+      const savedCode = localStorage.getItem("quiz-player-code");
+      if (savedCode) setCode(savedCode);
+    }
+    const savedName = localStorage.getItem("quiz-player-name");
+    if (savedName) setName(savedName);
+    const savedAvatar = localStorage.getItem("quiz-player-avatar");
+    if (savedAvatar && isAvatarId(savedAvatar)) setAvatar(savedAvatar);
+  }, [params]);
 
   useEffect(() => {
     if (!connected || !playerId || rejoinedRef.current) return;
@@ -158,51 +168,58 @@ function JoinInner() {
     return (
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-6 px-4 py-10">
         <div className="animate-fade-up">
-          <p className="text-sm uppercase tracking-[0.2em] text-amber-300/70">
-            Challenger
-          </p>
-          <h1 className="font-display text-4xl text-amber-100">加入競賽</h1>
+          <AccentLabel>Challenger</AccentLabel>
+          <h1 className="font-display text-4xl text-ink">加入競賽</h1>
         </div>
         {(error || (joined && state && !inRoom)) && (
-          <p className="animate-pop rounded-xl bg-rose-500/15 px-3 py-2 text-sm text-rose-200">
+          <Alert tone="error" className="animate-pop">
             {error || "你不在此房間（可能已被踢出），請重新加入"}
-          </p>
+          </Alert>
         )}
-        <label className="animate-fade-up block space-y-1" style={{ animationDelay: "60ms" }}>
-          <span className="text-sm text-white/50">房號</span>
-          <input
+        <Field
+          label="房號"
+          className="animate-fade-up"
+          style={{ animationDelay: "60ms" }}
+        >
+          <FieldInput
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             maxLength={6}
-            className="w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 font-display text-2xl tracking-[0.3em] outline-none focus:border-amber-300/50"
+            className="px-4 py-3 font-display text-2xl tracking-[0.3em]"
             placeholder="ABC123"
           />
-        </label>
-        <label className="animate-fade-up block space-y-1" style={{ animationDelay: "100ms" }}>
-          <span className="text-sm text-white/50">暱稱</span>
-          <input
+        </Field>
+        <Field
+          label="暱稱"
+          className="animate-fade-up"
+          style={{ animationDelay: "100ms" }}
+        >
+          <FieldInput
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={20}
-            className="w-full rounded-2xl border border-white/15 bg-black/30 px-4 py-3 outline-none focus:border-amber-300/50"
+            className="px-4 py-3"
             placeholder="你的名字"
           />
-        </label>
+        </Field>
         <div className="animate-fade-up" style={{ animationDelay: "140ms" }}>
           <AvatarPicker value={avatar} onChange={setAvatar} taken={takenAvatars} />
         </div>
-        <button
-          type="button"
-          disabled={!connected || !code || !name.trim()}
-          onClick={join}
-          className="animate-fade-up rounded-2xl bg-amber-400 py-3 font-display text-lg text-ink hover:bg-amber-300 disabled:opacity-40"
-          style={{ animationDelay: "180ms" }}
-        >
-          進入大廳
-        </button>
-        <Link href="/" className="text-center text-sm text-white/50 hover:text-white/80">
+        <div className="animate-fade-up" style={{ animationDelay: "180ms" }}>
+          <Button
+            disabled={!connected || !code || !name.trim()}
+            onClick={join}
+            variant="primary"
+            size="lg"
+            block
+            display
+          >
+            進入大廳
+          </Button>
+        </div>
+        <Button href="/" variant="ghost" size="sm" className="text-center">
           回首頁
-        </Link>
+        </Button>
       </main>
     );
   }
@@ -213,50 +230,47 @@ function JoinInner() {
         <div className="flex items-center gap-3">
           {me && <AvatarBadge avatar={me.avatar} size="lg" />}
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/70">
-              {state.code}
-            </p>
-            <h1 className="font-display text-2xl text-amber-100">
+            <AccentLabel className="text-xs">{state.code}</AccentLabel>
+            <h1 className="font-display text-2xl text-ink">
               {me?.name ?? name}
             </h1>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-xs text-white/50">目前分數</p>
-          <p className="font-display text-2xl tabular-nums text-amber-200">
+          <p className="text-xs text-muted">目前分數</p>
+          <p className="font-display text-2xl tabular-nums text-ink">
             {me?.score ?? 0}
           </p>
         </div>
       </header>
 
-      {error && (
-        <p className="rounded-xl bg-rose-500/15 px-3 py-2 text-sm text-rose-200">
-          {error}
-        </p>
-      )}
+      {error && <Alert tone="error">{error}</Alert>}
 
       {state.phase === "lobby" && (
-        <div className="animate-fade-up space-y-4 rounded-3xl bg-black/30 p-6 ring-1 ring-white/10">
-          <p className="text-center text-white/60">已進入大廳，等待 Host 開始…</p>
-          <p className="text-center text-sm text-white/40">
+        <Panel className="animate-fade-up space-y-4" padding="lg">
+          <p className="text-center text-muted">已進入大廳，等待 Host 開始…</p>
+          <p className="text-center text-sm text-faint">
             {state.playerCount}/{state.maxPlayers} 人 · 共 {state.questionCount} 題
             （題目內容暫不公開）
           </p>
           <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {state.players.map((p, i) => (
-              <li
-                key={p.id}
-                style={{ animationDelay: `${i * 40}ms` }}
-                className={`animate-pop flex items-center gap-2 rounded-xl bg-white/5 px-3 py-2 text-sm ${
-                  p.id === playerId ? "ring-1 ring-amber-300/50" : ""
-                }`}
-              >
-                <AvatarBadge avatar={p.avatar} size="sm" />
-                <span className="truncate">{p.name}</span>
+              <li key={p.id} style={{ animationDelay: `${i * 40}ms` }}>
+                {p.id === playerId ? (
+                  <Inset className="animate-pop flex items-center gap-2 px-3 py-2 text-sm">
+                    <AvatarBadge avatar={p.avatar} size="sm" />
+                    <span className="truncate">{p.name}</span>
+                  </Inset>
+                ) : (
+                  <Chip className="animate-pop flex items-center gap-2 px-3 py-2 text-sm">
+                    <AvatarBadge avatar={p.avatar} size="sm" />
+                    <span className="truncate">{p.name}</span>
+                  </Chip>
+                )}
               </li>
             ))}
           </ul>
-        </div>
+        </Panel>
       )}
 
       {state.phase === "answering" && state.currentQuestion && (
@@ -273,7 +287,7 @@ function JoinInner() {
 
       {state.phase === "reveal" && state.currentQuestion && (
         <div className="animate-fade-up space-y-4">
-          <h2 className="font-display text-xl text-amber-50">
+          <h2 className="font-display text-xl text-ink">
             {state.currentQuestion.text}
           </h2>
           <QuestionMedia media={state.currentQuestion.media} playAudio={false} />
@@ -290,12 +304,12 @@ function JoinInner() {
       )}
 
       {state.phase === "final" && (
-        <div className="rounded-3xl bg-black/30 p-5 ring-1 ring-amber-300/30">
+        <Panel padding="md">
           <RankingChart state={state} highlightId={playerId} />
-          <p className="mt-4 text-center text-white/50">
+          <p className="mt-4 text-center text-muted">
             你的分數：{me?.score ?? 0}
           </p>
-        </div>
+        </Panel>
       )}
     </main>
   );
@@ -305,7 +319,7 @@ export default function JoinPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex flex-1 items-center justify-center text-white/50">
+        <main className="flex flex-1 items-center justify-center text-muted">
           載入中…
         </main>
       }

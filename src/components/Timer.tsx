@@ -21,8 +21,8 @@ export function Timer({ endsAt }: { endsAt: number | null }) {
     <div
       className={`inline-flex min-w-[4.5rem] items-center justify-center rounded-xl px-4 py-2 font-display text-3xl tabular-nums tracking-tight ${
         urgent
-          ? "bg-rose-500/20 text-rose-300 ring-1 ring-rose-400/40"
-          : "bg-white/10 text-amber-200 ring-1 ring-white/15"
+          ? "bg-gradient-to-br from-[#e85a5a] to-[#a33232] text-white shadow-[inset_3px_3px_8px_rgba(51,50,55,0.35),inset_-2px_-2px_6px_rgba(254,254,254,0.2)]"
+          : "neu-chip text-ink"
       }`}
       aria-live="polite"
     >
