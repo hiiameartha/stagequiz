@@ -3,11 +3,20 @@
 - Host / Client 即時限時問答；音樂僅 Host／展示屏播放
 - 大廳不公開題目內容；挑戰者選動物頭像
 - 最終名次含領獎台與長條圖
+- 可選 Postgres：題庫、房間狀態、比賽歷史持久化（見 [DEPLOY.md](DEPLOY.md)）
 
 ## 啟動
 
 ```bash
 npm install
+npm run dev
+```
+
+有 Postgres 時：
+
+```bash
+cp .env.example .env   # 填 DATABASE_URL
+npm run db:push
 npm run dev
 ```
 
