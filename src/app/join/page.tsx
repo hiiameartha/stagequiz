@@ -154,7 +154,7 @@ function JoinInner() {
     .filter((p) => p.id !== playerId)
     .map((p) => p.avatar);
 
-  if (!showGame) {
+  if (!showGame || !state) {
     return (
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-6 px-4 py-10">
         <div className="animate-fade-up">
