@@ -64,17 +64,24 @@ npm run dev
 
 ### 1) 部署 Realtime（Railway / Render）
 
-- **Start command**：`npm run start:realtime`
-- **Build**：`npm install`（可不跑 next build；若用 DB：`npm install && npm run db:push`）
-- **Render 注意**：正式環境預設不裝 `devDependencies`；本專案已把 `tsx` 放在 `dependencies`，否則 `start:realtime` 會立刻掛掉並回 502
+Render 建議設定（很重要，設錯會一直 502）：
+
+| 項目 | 值 |
+|------|-----|
+| **Build Command** | `npm install && npm run build:realtime` |
+| **Start Command** | `npm run start:realtime` |
+| **Health Check Path** | `/health` |
+
 - 環境變數：
-  - `CORS_ORIGIN` = 你的 Vercel 網址，例如 `https://stagequiz.vercel.app`（也可先用 `*`）
+  - `CORS_ORIGIN` = 你的 Vercel 網址，例如 `https://stagequiz-one.vercel.app`
   - `DATABASE_URL` = Postgres 連線字串（建議）
   - `PORT` 由平台自動注入
+- 也可使用 repo 根目錄的 `render.yaml` Blueprint
 
-記下 Realtime 公開網址，例如 `https://stagequiz-realtime.up.railway.app`。
+記下 Realtime 公開網址，例如 `https://stagequiz.onrender.com`。
 
-部署後先開 `https://你的網址/health`，應回 `{"ok":true,"service":"stagequiz-realtime"}`。若是 502，到 Render **Logs** 查看是否 `tsx: not found` 或程序崩潰。
+部署後先開 `https://你的網址/health`，應回 `{"ok":true,"service":"stagequiz-realtime"}`。  
+若仍是 502：到 Render **Logs** 確認有沒有 `StageQuiz realtime on http://...`；沒有就代表啟動失敗。
 
 ### 2) 部署前端到 Vercel
 

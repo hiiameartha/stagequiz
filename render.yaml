@@ -1,0 +1,17 @@
+# Render Blueprint — realtime Socket.io for StageQuiz (Vercel frontend)
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: stagequiz-realtime
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build:realtime
+    startCommand: npm run start:realtime
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
