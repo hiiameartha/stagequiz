@@ -66,12 +66,15 @@ npm run dev
 
 - **Start command**：`npm run start:realtime`
 - **Build**：`npm install`（可不跑 next build；若用 DB：`npm install && npm run db:push`）
+- **Render 注意**：正式環境預設不裝 `devDependencies`；本專案已把 `tsx` 放在 `dependencies`，否則 `start:realtime` 會立刻掛掉並回 502
 - 環境變數：
   - `CORS_ORIGIN` = 你的 Vercel 網址，例如 `https://stagequiz.vercel.app`（也可先用 `*`）
   - `DATABASE_URL` = Postgres 連線字串（建議）
   - `PORT` 由平台自動注入
 
 記下 Realtime 公開網址，例如 `https://stagequiz-realtime.up.railway.app`。
+
+部署後先開 `https://你的網址/health`，應回 `{"ok":true,"service":"stagequiz-realtime"}`。若是 502，到 Render **Logs** 查看是否 `tsx: not found` 或程序崩潰。
 
 ### 2) 部署前端到 Vercel
 
