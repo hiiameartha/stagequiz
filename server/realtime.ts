@@ -6,7 +6,7 @@ import "dotenv/config";
 import { createServer } from "http";
 import { attachQuizSocket } from "./attach-socket";
 
-const hostname = process.env.HOSTNAME || "0.0.0.0";
+const listenHost = "0.0.0.0";
 const port = Number(process.env.PORT || process.env.SOCKET_PORT || 3001);
 const corsOrigin = process.env.CORS_ORIGIN || "*";
 
@@ -22,6 +22,6 @@ const httpServer = createServer((req, res) => {
 
 attachQuizSocket(httpServer, corsOrigin);
 
-httpServer.listen(port, hostname, () => {
-  console.log(`> StageQuiz realtime on http://${hostname}:${port}`);
+httpServer.listen(port, listenHost, () => {
+  console.log(`> StageQuiz realtime on http://${listenHost}:${port}`);
 });

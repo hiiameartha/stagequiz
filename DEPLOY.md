@@ -77,6 +77,7 @@ Render 建議設定（很重要，設錯會一直 502）：
   - `DATABASE_URL` = Postgres 連線字串（建議）
   - `PORT` 由平台自動注入
 - 也可使用 repo 根目錄的 `render.yaml` Blueprint
+- **不要**用環境變數 `HOSTNAME` 當 listen 位址：Render 會注入容器主機名，綁錯介面會導致 Deploy **Timed Out**／502。本專案固定聽 `0.0.0.0`。
 
 記下 Realtime 公開網址，例如 `https://stagequiz.onrender.com`。
 
