@@ -109,18 +109,15 @@ export function QuestionMedia({
       );
     }
     return (
-      <Panel
-        className={`animate-fade-up overflow-hidden ${
-          large ? "max-h-[42vh]" : "max-h-56"
-        }`}
-        padding="none"
-      >
+      <Panel className="animate-fade-up overflow-hidden" padding="none">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={media.url}
           src={media.url}
           alt="題目圖片"
-          className="mx-auto max-h-full w-full object-contain"
+          className={`mx-auto block h-auto w-auto max-w-full object-contain ${
+            large ? "max-h-[min(56vh,720px)]" : "max-h-56"
+          }`}
           onError={() => setImgError(true)}
           onLoad={() => setImgError(false)}
         />

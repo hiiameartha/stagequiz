@@ -165,11 +165,6 @@ export class RoomManager {
     const trimmed = name.trim().slice(0, 20);
     if (!trimmed) return { ok: false, error: "請輸入暱稱" };
 
-    const avatarTaken = room.players.some((p) => p.avatar === avatar);
-    if (avatarTaken) {
-      return { ok: false, error: "這個動物頭像已被選走，換一個吧" };
-    }
-
     room.players.push({
       id: playerId,
       name: trimmed,

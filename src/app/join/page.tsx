@@ -166,9 +166,6 @@ function JoinInner() {
   const me = state?.players.find((p) => p.id === playerId);
   const inRoom = Boolean(me);
   const showGame = Boolean(joined && state && (state.phase !== "lobby" || inRoom));
-  const takenAvatars = (state?.players ?? [])
-    .filter((p) => p.id !== playerId)
-    .map((p) => p.avatar);
 
   if (!showGame || !state) {
     return (
@@ -209,7 +206,7 @@ function JoinInner() {
           />
         </Field>
         <div className="animate-fade-up" style={{ animationDelay: "140ms" }}>
-          <AvatarPicker value={avatar} onChange={setAvatar} taken={takenAvatars} />
+          <AvatarPicker value={avatar} onChange={setAvatar} />
         </div>
         <div className="animate-fade-up" style={{ animationDelay: "180ms" }}>
           <Button
