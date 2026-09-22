@@ -34,28 +34,24 @@ export function AvatarBadge({
 export function AvatarPicker({
   value,
   onChange,
-  taken = [],
 }: {
   value: AvatarId;
   onChange: (id: AvatarId) => void;
-  taken?: AvatarId[];
 }) {
   return (
     <div className="space-y-2">
       <p className="text-sm text-muted">選擇動物頭像</p>
       <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
         {AVATARS.map((a, i) => {
-          const isTaken = taken.includes(a.id) && a.id !== value;
           const selected = value === a.id;
           return (
             <button
               key={a.id}
               type="button"
-              disabled={isTaken}
-              title={isTaken ? `${a.label}已被選走` : a.label}
+              title={a.label}
               onClick={() => onChange(a.id)}
               style={{ animationDelay: `${i * 30}ms` }}
-              className={`animate-pop flex flex-col items-center gap-1 rounded-2xl px-1 py-2 text-2xl transition disabled:cursor-not-allowed disabled:opacity-25 ${
+              className={`animate-pop flex flex-col items-center gap-1 rounded-2xl px-1 py-2 text-2xl transition ${
                 selected
                   ? "neu-option is-selected scale-105"
                   : "neu-option"

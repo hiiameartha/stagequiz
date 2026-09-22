@@ -29,9 +29,23 @@ type Props = {
   questions: Question[];
   onChange: (questions: Question[]) => void;
   disabled?: boolean;
+  onSave?: () => void;
+  saveDisabled?: boolean;
+  saveHint?: string;
+  onCreateRoom?: () => void;
+  createDisabled?: boolean;
 };
 
-export function QuestionEditor({ questions, onChange, disabled }: Props) {
+export function QuestionEditor({
+  questions,
+  onChange,
+  disabled,
+  onSave,
+  saveDisabled,
+  saveHint,
+  onCreateRoom,
+  createDisabled,
+}: Props) {
   const [mediaDraft, setMediaDraft] = useState<
     Record<string, { type: MediaType; url: string }>
   >({});
@@ -50,19 +64,13 @@ export function QuestionEditor({ questions, onChange, disabled }: Props) {
     update(qi, { options });
   }
 
+  function addQuestion() {
+    onChange([...list, emptyQuestion()]);
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="font-display text-xl text-ink">題庫</h2>
-        <Button
-          disabled={disabled}
-          onClick={() => onChange([...list, emptyQuestion()])}
-          variant="accent"
-          size="sm"
-        >
-          新增題目
-        </Button>
-      </div>
+    <div className="space-y-4 pb-24">
+      <h2 className="font-display text-xl text-ink">題庫</h2>
 
       {list.map((q, qi) => {
         const draft = mediaDraft[q.id] ?? {
@@ -263,6 +271,44 @@ export function QuestionEditor({ questions, onChange, disabled }: Props) {
           </Panel>
         );
       })}
+
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-2 rounded-2xl bg-[var(--surface)]/95 px-3 py-2 shadow-[var(--neu-raised-lg)] ring-1 ring-[rgba(51,50,55,0.1)] backdrop-blur-md">
+          <Button
+            disabled={disabled}
+            onClick={addQuestion}
+            variant="accent"
+            size="md"
+          >
+            新增題目
+          </Button>
+          {onSave && (
+            <Button
+              disabled={disabled || saveDisabled}
+              onClick={onSave}
+              size="md"
+            >
+              儲存題庫
+            </Button>
+          )}
+          {onCreateRoom && (
+            <Button
+              disabled={disabled || createDisabled}
+              onClick={onCreateRoom}
+              variant="primary"
+              size="md"
+              display
+            >
+              建立房間
+            </Button>
+          )}
+          {saveHint && (
+            <span className="px-1 text-sm font-semibold text-[#2d7a4f]">
+              {saveHint}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

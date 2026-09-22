@@ -193,11 +193,15 @@ function DisplayInner() {
           </div>
         )}
 
-      {state.phase === "reveal" && state.currentQuestion && (
+      {(state.phase === "answering" || state.phase === "reveal") && (
         <AnswerMediaPopup
-          media={state.currentQuestion.media}
-          active
-          onContinue={() => hostAction("host:next")}
+          state={state}
+          media={state.currentQuestion?.media}
+          onContinue={
+            state.phase === "reveal"
+              ? () => hostAction("host:next")
+              : undefined
+          }
           continueLabel={continueLabel}
         />
       )}
