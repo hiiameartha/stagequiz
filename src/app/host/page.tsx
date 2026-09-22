@@ -514,11 +514,13 @@ export default function HostPage() {
               </Panel>
             )}
 
-            {reveal && state.currentQuestion && (
+            {(answering || reveal) && (
               <AnswerMediaPopup
-                media={state.currentQuestion.media}
-                active={reveal}
-                onContinue={() => hostAction("host:next")}
+                state={state}
+                media={state.currentQuestion?.media}
+                onContinue={
+                  reveal ? () => hostAction("host:next") : undefined
+                }
                 continueLabel={
                   state.currentIndex + 1 >= state.questionCount
                     ? "看最終名次"
