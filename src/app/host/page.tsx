@@ -310,28 +310,15 @@ export default function HostPage() {
           <p className="mb-4 text-muted">
             題庫全站共用一份，可隨時存到雲端；之後再建立房間給挑戰者加入（最多 20 人）。
           </p>
-          <QuestionEditor questions={questions} onChange={setQuestions} />
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Button
-              disabled={busy || !connected}
-              onClick={saveQuestions}
-              size="md"
-            >
-              儲存題庫
-            </Button>
-            <Button
-              disabled={busy || !connected}
-              onClick={createRoom}
-              variant="primary"
-              size="lg"
-              display
-            >
-              建立房間
-            </Button>
-            {saveHint && (
-              <span className="text-sm font-semibold text-[#2d7a4f]">{saveHint}</span>
-            )}
-          </div>
+          <QuestionEditor
+            questions={questions}
+            onChange={setQuestions}
+            onSave={saveQuestions}
+            saveDisabled={busy || !connected}
+            saveHint={saveHint}
+            onCreateRoom={createRoom}
+            createDisabled={busy || !connected}
+          />
         </Panel>
       )}
 
@@ -411,9 +398,6 @@ export default function HostPage() {
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {inLobby && (
                   <>
-                    <Button onClick={saveQuestions} disabled={busy} size="sm">
-                      儲存題庫
-                    </Button>
                     <Button
                       onClick={startGame}
                       disabled={busy}
@@ -423,13 +407,8 @@ export default function HostPage() {
                     >
                       開始競賽
                     </Button>
-                    {saveHint && (
-                      <span className="text-sm font-semibold text-[#2d7a4f]">
-                        {saveHint}
-                      </span>
-                    )}
                     <p className="w-full text-xs text-faint">
-                      也可到展示屏操作開始競賽。
+                      也可到展示屏操作開始競賽。題庫請用下方固定列儲存。
                     </p>
                   </>
                 )}
@@ -477,6 +456,9 @@ export default function HostPage() {
                 questions={questions}
                 onChange={setQuestions}
                 disabled={false}
+                onSave={saveQuestions}
+                saveDisabled={busy}
+                saveHint={saveHint}
               />
             )}
 

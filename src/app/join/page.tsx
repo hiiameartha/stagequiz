@@ -109,7 +109,10 @@ function JoinInner() {
   useEffect(() => {
     setPlayerId(getOrCreateId("quiz-player-id"));
     const fromUrl = params.get("code")?.toUpperCase();
-    if (!fromUrl) {
+    if (fromUrl) {
+      setCode(fromUrl);
+    } else {
+      // 僅預填房號，不自動進房（避免隔天被帶回舊房間）
       const savedCode = localStorage.getItem("quiz-player-code");
       if (savedCode) setCode(savedCode);
     }
@@ -120,25 +123,46 @@ function JoinInner() {
     setBootstrapped(true);
   }, [params]);
 
+  // 只在網址帶 ?code= 時自動重連（重整續玩）；純 /join 不強制進舊房
   useEffect(() => {
     if (!bootstrapped || !connected || !playerId || rejoinedRef.current) return;
-    const savedCode = localStorage.getItem("quiz-player-code");
-    if (!savedCode || !socket.current) return;
+    const urlCode = params.get("code")?.toUpperCase();
+    if (!urlCode || !socket.current) return;
     rejoinedRef.current = true;
     socket.current.emit(
       "room:rejoin",
-      { code: savedCode, playerId, role: "player" },
+      { code: urlCode, playerId, role: "player" },
       (res) => {
         if (res?.ok) {
           setJoined(true);
-          setCode(savedCode);
+          setCode(urlCode);
+          localStorage.setItem("quiz-player-code", urlCode);
         } else {
           localStorage.removeItem("quiz-player-code");
           rejoinedRef.current = false;
+          setError(res?.error ?? "無法回到該房間，請重新加入");
+          router.replace("/join");
         }
       }
     );
-  }, [bootstrapped, connected, playerId, socket]);
+  }, [bootstrapped, connected, playerId, socket, params, router]);
+
+  // 比賽結束後清掉房號，下次開啟不會自動回去
+  useEffect(() => {
+    if (state?.phase === "final") {
+      localStorage.removeItem("quiz-player-code");
+    }
+  }, [state?.phase]);
+
+  function clearRoomSession() {
+    localStorage.removeItem("quiz-player-code");
+    rejoinedRef.current = false;
+    setJoined(false);
+    setLastChoice(null);
+    setError("");
+    setCode("");
+    router.replace("/join");
+  }
 
   function join() {
     if (!socket.current || !playerId) return;
@@ -273,6 +297,15 @@ function JoinInner() {
               </li>
             ))}
           </ul>
+          <Button
+            onClick={clearRoomSession}
+            variant="ghost"
+            size="sm"
+            block
+            className="text-muted"
+          >
+            離開並加入其他房間
+          </Button>
         </Panel>
       )}
 
@@ -312,6 +345,16 @@ function JoinInner() {
           <p className="mt-4 text-center text-muted">
             你的分數：{me?.score ?? 0}
           </p>
+          <Button
+            onClick={clearRoomSession}
+            variant="primary"
+            size="lg"
+            block
+            display
+            className="mt-6"
+          >
+            加入其他房間
+          </Button>
         </Panel>
       )}
     </main>
