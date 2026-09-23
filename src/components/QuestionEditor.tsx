@@ -10,13 +10,14 @@ import {
   Inset,
   Panel,
 } from "@/components/ui";
+import { createId } from "@/lib/id";
 import { OPTION_LABELS } from "@/lib/quiz/types";
 import { parseYouTubeUrl } from "@/lib/quiz/youtube";
 import type { MediaType, Question } from "@/lib/quiz/types";
 
 function emptyQuestion(): Question {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     text: "",
     options: ["", "", "", ""],
     correctIndex: 0,

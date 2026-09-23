@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AvatarBadge, AvatarPicker } from "@/components/Avatar";
 import { Leaderboard, RevealBoard } from "@/components/Leaderboard";
 import { OptionGrid } from "@/components/OptionGrid";
@@ -20,10 +20,27 @@ import {
 } from "@/components/ui";
 import { getOrCreateId, useQuizSocket, type QuizSocket } from "@/lib/socket";
 import {
+  DEFAULT_AVATAR,
   isAvatarId,
   type AvatarId,
   type RoomState,
 } from "@/lib/quiz/types";
+
+function usePlayerId() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => getOrCreateId("quiz-player-id"),
+    () => ""
+  );
+}
+
+function useLocalStorageValue(key: string, fallback: string) {
+  return useSyncExternalStore(
+    () => () => {},
+    () => localStorage.getItem(key) ?? fallback,
+    () => fallback
+  );
+}
 
 function AnsweringPanel({
   state,
@@ -94,39 +111,28 @@ function JoinInner() {
   const params = useSearchParams();
   const { socket, connected, state } = useQuizSocket();
 
-  const [playerId, setPlayerId] = useState("");
-  const [code, setCode] = useState(
-    () => params.get("code")?.toUpperCase() ?? ""
-  );
-  const [name, setName] = useState("");
-  const [avatar, setAvatar] = useState<AvatarId>("fox");
-  const [bootstrapped, setBootstrapped] = useState(false);
+  const playerId = usePlayerId();
+  const urlCode = params.get("code")?.toUpperCase() ?? "";
+  const savedCode = useLocalStorageValue("quiz-player-code", "");
+  const savedName = useLocalStorageValue("quiz-player-name", "");
+  const savedAvatarRaw = useLocalStorageValue("quiz-player-avatar", DEFAULT_AVATAR);
+  const savedAvatar = isAvatarId(savedAvatarRaw) ? savedAvatarRaw : DEFAULT_AVATAR;
+
+  const [codeDraft, setCodeDraft] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [avatarDraft, setAvatarDraft] = useState<AvatarId | null>(null);
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState("");
   const [lastChoice, setLastChoice] = useState<number | null>(null);
   const rejoinedRef = useRef(false);
 
-  useEffect(() => {
-    setPlayerId(getOrCreateId("quiz-player-id"));
-    const fromUrl = params.get("code")?.toUpperCase();
-    if (fromUrl) {
-      setCode(fromUrl);
-    } else {
-      // 僅預填房號，不自動進房（避免隔天被帶回舊房間）
-      const savedCode = localStorage.getItem("quiz-player-code");
-      if (savedCode) setCode(savedCode);
-    }
-    const savedName = localStorage.getItem("quiz-player-name");
-    if (savedName) setName(savedName);
-    const savedAvatar = localStorage.getItem("quiz-player-avatar");
-    if (savedAvatar && isAvatarId(savedAvatar)) setAvatar(savedAvatar);
-    setBootstrapped(true);
-  }, [params]);
+  const code = codeDraft ?? (urlCode || savedCode);
+  const name = nameDraft ?? savedName;
+  const avatar = avatarDraft ?? savedAvatar;
 
   // 只在網址帶 ?code= 時自動重連（重整續玩）；純 /join 不強制進舊房
   useEffect(() => {
-    if (!bootstrapped || !connected || !playerId || rejoinedRef.current) return;
-    const urlCode = params.get("code")?.toUpperCase();
+    if (!connected || !playerId || rejoinedRef.current) return;
     if (!urlCode || !socket.current) return;
     rejoinedRef.current = true;
     socket.current.emit(
@@ -135,7 +141,7 @@ function JoinInner() {
       (res) => {
         if (res?.ok) {
           setJoined(true);
-          setCode(urlCode);
+          setCodeDraft(urlCode);
           localStorage.setItem("quiz-player-code", urlCode);
         } else {
           localStorage.removeItem("quiz-player-code");
@@ -145,7 +151,7 @@ function JoinInner() {
         }
       }
     );
-  }, [bootstrapped, connected, playerId, socket, params, router]);
+  }, [connected, playerId, socket, urlCode, router]);
 
   // 比賽結束後清掉房號，下次開啟不會自動回去
   useEffect(() => {
@@ -160,7 +166,7 @@ function JoinInner() {
     setJoined(false);
     setLastChoice(null);
     setError("");
-    setCode("");
+    setCodeDraft("");
     router.replace("/join");
   }
 
@@ -180,7 +186,7 @@ function JoinInner() {
         localStorage.setItem("quiz-player-name", name.trim());
         localStorage.setItem("quiz-player-avatar", avatar);
         setJoined(true);
-        setCode(normalized);
+        setCodeDraft(normalized);
         rejoinedRef.current = true;
         router.replace(`/join?code=${normalized}`);
       }
@@ -210,7 +216,7 @@ function JoinInner() {
         >
           <FieldInput
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onChange={(e) => setCodeDraft(e.target.value.toUpperCase())}
             maxLength={6}
             className="px-4 py-3 font-display text-2xl tracking-[0.3em]"
             placeholder="ABC123"
@@ -223,14 +229,14 @@ function JoinInner() {
         >
           <FieldInput
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setNameDraft(e.target.value)}
             maxLength={20}
             className="px-4 py-3"
             placeholder="你的名字"
           />
         </Field>
         <div className="animate-fade-up" style={{ animationDelay: "140ms" }}>
-          <AvatarPicker value={avatar} onChange={setAvatar} />
+          <AvatarPicker value={avatar} onChange={setAvatarDraft} />
         </div>
         <div className="animate-fade-up" style={{ animationDelay: "180ms" }}>
           <Button

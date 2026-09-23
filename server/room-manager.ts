@@ -318,6 +318,17 @@ export class RoomManager {
     room.questionEndsAt = null;
   }
 
+  /** Host 中途結束本局（驗證後由 finishAndPersist 進入 final） */
+  endGame(code: string, hostId: string) {
+    const room = this.get(code);
+    if (!room) return { ok: false as const, error: "找不到房間" };
+    if (room.hostId !== hostId) return { ok: false as const, error: "無權限" };
+    if (room.phase !== "answering" && room.phase !== "reveal") {
+      return { ok: false as const, error: "目前無法結束本局" };
+    }
+    return { ok: true as const, room };
+  }
+
   buildReveal(room: Room): RevealEntry[] {
     const q = room.questions[room.currentIndex];
     if (!q) return [];

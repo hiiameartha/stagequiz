@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AvatarBadge } from "@/components/Avatar";
 import { Leaderboard, RevealBoard } from "@/components/Leaderboard";
 import { OptionGrid } from "@/components/OptionGrid";
@@ -12,18 +12,22 @@ import { Timer } from "@/components/Timer";
 import { AccentLabel, Chip, Panel } from "@/components/ui";
 import { getOrCreateId, useQuizSocket } from "@/lib/socket";
 
+function useHostId() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => getOrCreateId("quiz-host-id"),
+    () => ""
+  );
+}
+
 function DisplayInner() {
   const params = useSearchParams();
   const { socket, connected, state } = useQuizSocket();
-  const [hostId, setHostId] = useState("");
+  const hostId = useHostId();
   const codeParam = params.get("code") || "";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const rejoinedRef = useRef(false);
-
-  useEffect(() => {
-    setHostId(getOrCreateId("quiz-host-id"));
-  }, []);
 
   useEffect(() => {
     if (!connected || !hostId || rejoinedRef.current) return;
@@ -67,6 +71,16 @@ function DisplayInner() {
     setError("");
     socket.current.emit(event, { code: roomCode, hostId }, (res) => {
       if (!res?.ok) setError(res?.error ?? "操作失敗");
+    });
+  }
+
+  function endGame() {
+    if (!socket.current || !hostId) return;
+    const roomCode = state?.code || code;
+    if (!roomCode) return;
+    setError("");
+    socket.current.emit("host:endGame", { code: roomCode, hostId }, (res) => {
+      if (!res?.ok) setError(res?.error ?? "結束失敗");
     });
   }
 
@@ -137,7 +151,7 @@ function DisplayInner() {
               ))}
             </ul>
             {!state.players.length && (
-              <p className="text-faint">等待挑戰者選擇動物頭像加入…</p>
+              <p className="text-faint">等待挑戰者加入…</p>
             )}
           </div>
         </div>
@@ -190,6 +204,15 @@ function DisplayInner() {
                 </div>
               </>
             )}
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={endGame}
+                className="rounded-2xl px-6 py-2 text-sm text-muted ring-1 ring-[rgba(51,50,55,0.12)] hover:bg-[var(--surface-muted)]"
+              >
+                結束本局
+              </button>
+            </div>
           </div>
         )}
 
