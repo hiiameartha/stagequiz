@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
+import { createId } from "@/lib/id";
 import type {
   ClientToServerEvents,
   RoomState,
@@ -47,10 +48,7 @@ export function getOrCreateId(key: string): string {
   if (typeof window === "undefined") return "";
   const existing = localStorage.getItem(key);
   if (existing) return existing;
-  const id =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const id = createId();
   localStorage.setItem(key, id);
   return id;
 }

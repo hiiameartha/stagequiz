@@ -23,23 +23,8 @@ export type PlayerAnswer = {
   pointsEarned: number;
 };
 
-export type AvatarId =
-  | "fox"
-  | "cat"
-  | "dog"
-  | "panda"
-  | "rabbit"
-  | "owl"
-  | "lion"
-  | "bear"
-  | "frog"
-  | "penguin"
-  | "koala"
-  | "tiger"
-  | "unicorn"
-  | "dragon"
-  | "whale"
-  | "chick";
+/** 頭像：emoji 字元，或舊版 slug（如 fox） */
+export type AvatarId = string;
 
 export type Player = {
   id: string;
@@ -94,31 +79,44 @@ export type RoomState = {
 export const MAX_PLAYERS = 20;
 export const OPTION_LABELS = ["A", "B", "C", "D"] as const;
 
-export const AVATARS: Array<{ id: AvatarId; emoji: string; label: string }> = [
-  { id: "fox", emoji: "🦊", label: "狐狸" },
-  { id: "cat", emoji: "🐱", label: "貓咪" },
-  { id: "dog", emoji: "🐶", label: "狗狗" },
-  { id: "panda", emoji: "🐼", label: "熊貓" },
-  { id: "rabbit", emoji: "🐰", label: "兔子" },
-  { id: "owl", emoji: "🦉", label: "貓頭鷹" },
-  { id: "lion", emoji: "🦁", label: "獅子" },
-  { id: "bear", emoji: "🐻", label: "熊熊" },
-  { id: "frog", emoji: "🐸", label: "青蛙" },
-  { id: "penguin", emoji: "🐧", label: "企鵝" },
-  { id: "koala", emoji: "🐨", label: "無尾熊" },
-  { id: "tiger", emoji: "🐯", label: "老虎" },
-  { id: "unicorn", emoji: "🦄", label: "獨角獸" },
-  { id: "dragon", emoji: "🐲", label: "龍" },
-  { id: "whale", emoji: "🐳", label: "鯨魚" },
-  { id: "chick", emoji: "🐥", label: "小雞" },
-];
+/** 舊版以 slug 存頭像；新版直接存 emoji */
+const LEGACY_AVATAR_EMOJI: Record<string, string> = {
+  fox: "🦊",
+  cat: "🐱",
+  dog: "🐶",
+  panda: "🐼",
+  rabbit: "🐰",
+  owl: "🦉",
+  lion: "🦁",
+  bear: "🐻",
+  frog: "🐸",
+  penguin: "🐧",
+  koala: "🐨",
+  tiger: "🐯",
+  unicorn: "🦄",
+  dragon: "🐲",
+  whale: "🐳",
+  chick: "🐥",
+};
+
+export const DEFAULT_AVATAR: AvatarId = "🦊";
 
 export function avatarEmoji(id: AvatarId | undefined): string {
-  return AVATARS.find((a) => a.id === id)?.emoji ?? "🦊";
+  if (!id) return DEFAULT_AVATAR;
+  return LEGACY_AVATAR_EMOJI[id] ?? id;
 }
 
+/** 允許舊 slug，或最多 4 個字素的 emoji 字串 */
 export function isAvatarId(v: string): v is AvatarId {
-  return AVATARS.some((a) => a.id === v);
+  if (!v || /\s/.test(v) || v.length > 24) return false;
+  if (v in LEGACY_AVATAR_EMOJI) return true;
+  if (/[\u0000-\u001F\u007F]/.test(v)) return false;
+  const graphemes =
+    typeof Intl !== "undefined" && "Segmenter" in Intl
+      ? [...new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(v)]
+          .length
+      : [...v].length;
+  return graphemes >= 1 && graphemes <= 4;
 }
 
 export type MatchSummary = {
@@ -173,6 +171,10 @@ export type ClientToServerEvents = {
     ack?: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;
   "host:forceReveal": (
+    payload: { code: string; hostId: string },
+    ack?: (res: { ok: true } | { ok: false; error: string }) => void
+  ) => void;
+  "host:endGame": (
     payload: { code: string; hostId: string },
     ack?: (res: { ok: true } | { ok: false; error: string }) => void
   ) => void;

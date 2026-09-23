@@ -29,7 +29,7 @@ export function FieldInput({
   ...props
 }: InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <input className={cn("neu-input px-3 py-2 text-sm", className)} {...props} />
+    <input className={cn("neu-input px-3 py-2 text-base", className)} {...props} />
   );
 }
 
@@ -39,7 +39,7 @@ export function FieldTextarea({
 }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
-      className={cn("neu-input px-3 py-2 text-sm", className)}
+      className={cn("neu-input px-3 py-2 text-base", className)}
       {...props}
     />
   );
@@ -52,7 +52,7 @@ export function FieldSelect({
 }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={cn("neu-input neu-input-auto px-2.5 py-2 text-sm", className)}
+      className={cn("neu-input neu-input-auto px-2.5 py-2 text-base", className)}
       {...props}
     >
       {children}

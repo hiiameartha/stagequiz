@@ -9,10 +9,10 @@ import next from "next";
 import { attachQuizSocket } from "./attach-socket";
 
 const dev = process.env.NODE_ENV !== "production";
-const hostname = process.env.HOSTNAME || "0.0.0.0";
+const listenHost = "0.0.0.0";
 const port = Number(process.env.PORT || 3000);
 
-const app = next({ dev, hostname, port });
+const app = next({ dev, hostname: listenHost, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
@@ -23,7 +23,7 @@ app.prepare().then(() => {
 
   attachQuizSocket(httpServer, process.env.CORS_ORIGIN || "*");
 
-  httpServer.listen(port, hostname, () => {
-    console.log(`> StageQuiz ready on http://${hostname}:${port}`);
+  httpServer.listen(port, listenHost, () => {
+    console.log(`> StageQuiz ready on http://${listenHost}:${port}`);
   });
 });
