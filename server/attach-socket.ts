@@ -254,6 +254,7 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
         return;
       }
 
+      rooms.shuffleQuestionsForRound(room);
       rooms.startQuestion(room, 0, () => revealAndEmit(room.code));
       await persistRoom(room);
       ack?.({ ok: true });
