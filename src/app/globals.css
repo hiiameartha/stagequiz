@@ -106,6 +106,8 @@ body {
   border: 1px solid rgba(51, 50, 55, 0.1);
   background: var(--surface-muted);
   color: var(--ink);
+  /* ≥16px：避免 iOS 聚焦 input 時整頁放大 */
+  font-size: 1rem;
   box-shadow: var(--neu-inset-sm);
   outline: none;
   transition:
@@ -145,6 +147,12 @@ body {
 
 .neu-input:disabled {
   opacity: 0.45;
+}
+
+/* emoji-picker 搜尋框也需 ≥16px，避免手機聚焦放大 */
+.EmojiPickerReact input.epr-search,
+.EmojiPickerReact .epr-search-container input {
+  font-size: 1rem !important;
 }
 
 /* —— Buttons: shell + face + marquee ring —— */
