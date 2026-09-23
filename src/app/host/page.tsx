@@ -255,6 +255,18 @@ export default function HostPage() {
     });
   }
 
+  function endGame() {
+    if (!socket.current || !code || !hostId) return;
+    setError("");
+    socket.current.emit("host:endGame", { code, hostId }, (res) => {
+      if (!res?.ok) {
+        setError(res?.error ?? "結束失敗");
+        return;
+      }
+      refreshMatches();
+    });
+  }
+
   function kick(playerId: string) {
     if (!socket.current || !code || !hostId) return;
     socket.current.emit("host:kick", { code, hostId, playerId }, (res) => {
@@ -432,6 +444,11 @@ export default function HostPage() {
                     {state.currentIndex + 1 >= state.questionCount
                       ? "看最終名次"
                       : "下一題"}
+                  </Button>
+                )}
+                {(answering || reveal) && (
+                  <Button onClick={endGame} variant="ghost" size="md">
+                    結束本局
                   </Button>
                 )}
                 {final && (

@@ -1,6 +1,23 @@
 "use client";
 
-import { AVATARS, type AvatarId } from "@/lib/quiz/types";
+import dynamic from "next/dynamic";
+import {
+  DEFAULT_AVATAR,
+  avatarEmoji,
+  type AvatarId,
+} from "@/lib/quiz/types";
+
+const EmojiPicker = dynamic(
+  () => import("emoji-picker-react").then((m) => m.default),
+  {
+    ssr: false,
+    loading: () => (
+      <p className="rounded-2xl bg-[var(--surface-muted)] px-4 py-8 text-center text-sm text-muted">
+        載入表情符號…
+      </p>
+    ),
+  }
+);
 
 export function AvatarBadge({
   avatar,
@@ -11,7 +28,7 @@ export function AvatarBadge({
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }) {
-  const emoji = AVATARS.find((a) => a.id === avatar)?.emoji ?? "🦊";
+  const emoji = avatarEmoji(avatar);
   const sizeClass =
     size === "sm"
       ? "h-8 w-8 text-lg"
@@ -38,30 +55,29 @@ export function AvatarPicker({
   value: AvatarId;
   onChange: (id: AvatarId) => void;
 }) {
+  const selectedEmoji = avatarEmoji(value);
+
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-muted">選擇動物頭像</p>
-      <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-        {AVATARS.map((a, i) => {
-          const selected = value === a.id;
-          return (
-            <button
-              key={a.id}
-              type="button"
-              title={a.label}
-              onClick={() => onChange(a.id)}
-              style={{ animationDelay: `${i * 30}ms` }}
-              className={`animate-pop flex flex-col items-center gap-1 rounded-2xl px-1 py-2 text-2xl transition ${
-                selected
-                  ? "neu-option is-selected scale-105"
-                  : "neu-option"
-              }`}
-            >
-              <span>{a.emoji}</span>
-              <span className="text-[10px] text-faint">{a.label}</span>
-            </button>
-          );
-        })}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted">選擇頭像</p>
+        <span className="neu-avatar inline-flex h-10 w-10 items-center justify-center rounded-full text-2xl">
+          {selectedEmoji}
+        </span>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl ring-1 ring-[rgba(51,50,55,0.08)]">
+        <EmojiPicker
+          onEmojiClick={(emojiData) => {
+            onChange(emojiData.emoji || DEFAULT_AVATAR);
+          }}
+          width="100%"
+          height={360}
+          previewConfig={{ showPreview: false }}
+          skinTonesDisabled
+          searchPlaceHolder="搜尋表情…"
+          lazyLoadEmojis
+        />
       </div>
     </div>
   );

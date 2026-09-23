@@ -309,6 +309,18 @@ export function attachQuizSocket(httpServer: HttpServer, corsOrigin: string | st
       ack?.({ ok: true });
     });
 
+    socket.on("host:endGame", async (payload, ack) => {
+      await ensureRoom(payload.code);
+      const result = rooms.endGame(payload.code, payload.hostId);
+      if (!result.ok) {
+        ack?.({ ok: false, error: result.error });
+        return;
+      }
+      await finishAndPersist(result.room);
+      ack?.({ ok: true });
+      emitState(result.room.code);
+    });
+
     socket.on("host:startTimer", async (payload, ack) => {
       await ensureRoom(payload.code);
       const room = rooms.get(payload.code);
