@@ -6,7 +6,7 @@ export const SAMPLE_QUESTIONS: Question[] = [
     text: "下列哪一個是日本首都？",
     options: ["大阪", "東京", "京都", "名古屋"],
     correctIndex: 1,
-    timeLimitSec: 20,
+    timeLimitSec: 30,
     points: 1000,
   },
   {
@@ -18,7 +18,7 @@ export const SAMPLE_QUESTIONS: Question[] = [
       type: "image",
       url: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80",
     },
-    timeLimitSec: 25,
+    timeLimitSec: 30,
     points: 1000,
   },
   {

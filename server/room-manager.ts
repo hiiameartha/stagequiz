@@ -44,6 +44,16 @@ function generateCode(): string {
   return code;
 }
 
+/** Fisher–Yates：打亂陣列順序（就地） */
+function shuffleInPlace<T>(items: T[]): void {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = items[i]!;
+    items[i] = items[j]!;
+    items[j] = tmp;
+  }
+}
+
 function toPublicQuestion(
   q: Question,
   includeCorrect: boolean,
@@ -225,6 +235,11 @@ export class RoomManager {
       if (p) p.connected = false;
     }
     void socketId;
+  }
+
+  /** 開始比賽前打亂本題場次順序（不影響雲端題庫） */
+  shuffleQuestionsForRound(room: Room) {
+    shuffleInPlace(room.questions);
   }
 
   startQuestion(room: Room, index: number, onTimeout: () => void) {
