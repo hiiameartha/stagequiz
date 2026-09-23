@@ -21,7 +21,7 @@ function emptyQuestion(): Question {
     text: "",
     options: ["", "", "", ""],
     correctIndex: 0,
-    timeLimitSec: 20,
+    timeLimitSec: 30,
     points: 1000,
   };
 }
@@ -154,7 +154,7 @@ export function QuestionEditor({
                   disabled={disabled}
                   value={q.timeLimitSec}
                   onChange={(e) =>
-                    update(qi, { timeLimitSec: Number(e.target.value) || 20 })
+                    update(qi, { timeLimitSec: Number(e.target.value) || 30 })
                   }
                   className="tabular-nums"
                 />
