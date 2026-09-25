@@ -3,11 +3,12 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AvatarBadge } from "@/components/Avatar";
-import { Leaderboard, RevealBoard } from "@/components/Leaderboard";
+import { RevealBoard } from "@/components/Leaderboard";
 import { OptionGrid } from "@/components/OptionGrid";
 import { QuestionMedia } from "@/components/QuestionMedia";
 import { AnswerMediaPopup } from "@/components/AnswerMediaPopup";
 import { RankingChart } from "@/components/RankingChart";
+import { ScoreRace } from "@/components/ScoreRace";
 import { Timer } from "@/components/Timer";
 import { AccentLabel, Chip, Panel } from "@/components/ui";
 import { getOrCreateId, useQuizSocket } from "@/lib/socket";
@@ -137,6 +138,19 @@ function DisplayInner() {
               {state.playerCount} / {state.maxPlayers} 人
             </p>
             <p className="mt-2 text-faint">共 {state.questionCount} 題（內容保密）</p>
+            <div className="mt-8">
+              <button
+                type="button"
+                onClick={startGame}
+                disabled={busy || state.playerCount < 1}
+                className="rounded-2xl bg-amber-400 px-8 py-3 font-display text-xl text-ink hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy ? "開始中…" : "開始競賽"}
+              </button>
+              {state.playerCount < 1 && (
+                <p className="mt-3 text-sm text-faint">至少需要一位挑戰者</p>
+              )}
+            </div>
           </Panel>
           <div className="animate-fade-up space-y-3" style={{ animationDelay: "80ms" }}>
             <h3 className="font-display text-lg text-ink">動物小隊</h3>
@@ -192,19 +206,33 @@ function DisplayInner() {
             {state.phase === "reveal" && (
               <>
                 <RevealBoard state={state} />
-                <Leaderboard state={state} />
-                <div className="flex justify-center pt-2">
-                  <button
-                    type="button"
-                    onClick={() => hostAction("host:next")}
-                    className="rounded-2xl bg-amber-400 px-8 py-3 font-display text-xl text-ink hover:bg-amber-300"
-                  >
-                    {continueLabel}
-                  </button>
-                </div>
+                <ScoreRace
+                  key={`race-${state.currentIndex}`}
+                  state={state}
+                  title="衝分排名"
+                  large
+                />
               </>
             )}
-            <div className="flex justify-center pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              {state.phase === "answering" && (
+                <button
+                  type="button"
+                  onClick={() => hostAction("host:forceReveal")}
+                  className="rounded-2xl bg-rose-500 px-8 py-3 font-display text-xl text-white hover:bg-rose-400"
+                >
+                  提前公布
+                </button>
+              )}
+              {state.phase === "reveal" && (
+                <button
+                  type="button"
+                  onClick={() => hostAction("host:next")}
+                  className="rounded-2xl bg-amber-400 px-8 py-3 font-display text-xl text-ink hover:bg-amber-300"
+                >
+                  {continueLabel}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={endGame}
@@ -230,9 +258,18 @@ function DisplayInner() {
       )}
 
       {state.phase === "final" && (
-        <Panel padding="lg">
-          <RankingChart state={state} title="冠亞季軍＆全體名次" />
-        </Panel>
+        <div className="space-y-6">
+          <ScoreRace
+            key={`final-${state.code}`}
+            state={state}
+            title="最終總分衝刺"
+            large
+            durationMs={4200}
+          />
+          <Panel padding="lg">
+            <RankingChart state={state} title="冠亞季軍＆全體名次" />
+          </Panel>
+        </div>
       )}
     </main>
   );

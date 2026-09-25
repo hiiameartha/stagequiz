@@ -3,10 +3,11 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AvatarBadge, AvatarPicker } from "@/components/Avatar";
-import { Leaderboard, RevealBoard } from "@/components/Leaderboard";
+import { RevealBoard } from "@/components/Leaderboard";
 import { OptionGrid } from "@/components/OptionGrid";
 import { QuestionMedia } from "@/components/QuestionMedia";
 import { RankingChart } from "@/components/RankingChart";
+import { ScoreRace } from "@/components/ScoreRace";
 import { Timer } from "@/components/Timer";
 import {
   AccentLabel,
@@ -341,13 +342,27 @@ function JoinInner() {
             disabled
           />
           <RevealBoard state={state} />
-          <Leaderboard state={state} highlightId={playerId} />
+          <ScoreRace
+            key={`race-${state.currentIndex}`}
+            state={state}
+            highlightId={playerId}
+            title="衝分排名"
+          />
         </div>
       )}
 
       {state.phase === "final" && (
         <Panel padding="md">
-          <RankingChart state={state} highlightId={playerId} />
+          <ScoreRace
+            key={`final-${state.code}`}
+            state={state}
+            highlightId={playerId}
+            title="最終總分衝刺"
+            durationMs={4200}
+          />
+          <div className="mt-6">
+            <RankingChart state={state} highlightId={playerId} title="" />
+          </div>
           <p className="mt-4 text-center text-muted">
             你的分數：{me?.score ?? 0}
           </p>

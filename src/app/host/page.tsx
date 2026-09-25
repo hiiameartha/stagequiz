@@ -7,6 +7,7 @@ import { OptionGrid } from "@/components/OptionGrid";
 import { QuestionEditor } from "@/components/QuestionEditor";
 import { QuestionMedia } from "@/components/QuestionMedia";
 import { RankingChart } from "@/components/RankingChart";
+import { ScoreRace } from "@/components/ScoreRace";
 import { Timer } from "@/components/Timer";
 import {
   Alert,
@@ -16,6 +17,7 @@ import {
   Panel,
 } from "@/components/ui";
 import { SAMPLE_QUESTIONS } from "@/lib/quiz/sample-questions";
+import { withAnsweredLeaderboard } from "@/lib/quiz/answered-leaderboard";
 import { getOrCreateId, useQuizSocket } from "@/lib/socket";
 import type { MatchSummary, Question } from "@/lib/quiz/types";
 import { avatarEmoji } from "@/lib/quiz/types";
@@ -530,7 +532,16 @@ export default function HostPage() {
 
             {final && (
               <Panel padding="lg">
-                <RankingChart state={state} />
+                <ScoreRace
+                  key={`final-${state.code}`}
+                  state={state}
+                  title="最終總分衝刺"
+                  large
+                  durationMs={4200}
+                />
+                <div className="mt-6">
+                  <RankingChart state={state} title="冠亞季軍＆全體名次" />
+                </div>
               </Panel>
             )}
           </section>
@@ -575,7 +586,20 @@ export default function HostPage() {
                 )}
               </ul>
             </Panel>
-            <Leaderboard state={state} />
+            {reveal ? (
+              <ScoreRace
+                key={`race-${state.currentIndex}`}
+                state={state}
+                title="衝分排名"
+              />
+            ) : (
+              <Leaderboard
+                state={
+                  answering ? withAnsweredLeaderboard(state) : state
+                }
+                title={answering ? "已交卷排名" : "排行榜"}
+              />
+            )}
           </aside>
         </div>
       )}
