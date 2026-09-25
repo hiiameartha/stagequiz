@@ -258,18 +258,9 @@ function DisplayInner() {
       )}
 
       {state.phase === "final" && (
-        <div className="space-y-6">
-          <ScoreRace
-            key={`final-${state.code}`}
-            state={state}
-            title="最終總分衝刺"
-            large
-            durationMs={4200}
-          />
-          <Panel padding="lg">
-            <RankingChart state={state} title="冠亞季軍＆全體名次" />
-          </Panel>
-        </div>
+        <Panel padding="lg" className="animate-fade-up">
+          <RankingChart state={state} title="冠亞季軍＆全體名次" />
+        </Panel>
       )}
     </main>
   );

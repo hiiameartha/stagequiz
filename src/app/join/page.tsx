@@ -123,13 +123,23 @@ function JoinInner() {
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [avatarDraft, setAvatarDraft] = useState<AvatarId | null>(null);
   const [joined, setJoined] = useState(false);
-  const [error, setError] = useState("");
+  const [errorState, setErrorState] = useState<{
+    message: string;
+    scope: string;
+  } | null>(null);
   const [lastChoice, setLastChoice] = useState<number | null>(null);
   const rejoinedRef = useRef(false);
 
   const code = codeDraft ?? (urlCode || savedCode);
   const name = nameDraft ?? savedName;
   const avatar = avatarDraft ?? savedAvatar;
+  // 錯誤綁定目前題目／階段；換題後 scope 不同即自動不再顯示
+  const errorScope = `${state?.phase ?? ""}:${state?.currentIndex ?? ""}`;
+  const error =
+    errorState && errorState.scope === errorScope ? errorState.message : "";
+  const setError = (message: string) => {
+    setErrorState(message ? { message, scope: errorScope } : null);
+  };
 
   // 只在網址帶 ?code= 時自動重連（重整續玩）；純 /join 不強制進舊房
   useEffect(() => {
