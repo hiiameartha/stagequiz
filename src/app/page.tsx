@@ -23,6 +23,14 @@ export default function HomePage() {
               我是挑戰者
             </Button>
           </div>
+          <p className="mt-6 text-sm text-faint">
+            <a
+              href="/demo/score-race"
+              className="text-[var(--orange-deep)] underline-offset-2 hover:underline"
+            >
+              衝分排名動畫示範
+            </a>
+          </p>
         </Panel>
       </div>
     </main>
