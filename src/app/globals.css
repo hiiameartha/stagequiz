@@ -330,47 +330,116 @@ body {
   background: rgba(51, 50, 55, 0.1);
 }
 
-/* —— Option tiles —— */
+/* —— Option tiles（A/B/C/D 色塊，方便快速辨識） —— */
 .neu-option {
-  background: var(--surface);
-  border: 1.5px solid rgba(51, 50, 55, 0.1);
+  --opt-bg: var(--surface);
+  --opt-bg-hover: #fff8f2;
+  --opt-bg-active: linear-gradient(145deg, #fff1e4, #ffe0c4);
+  --opt-border: rgba(51, 50, 55, 0.1);
+  --opt-fg: var(--ink);
+  --opt-label-bg: var(--ink);
+  --opt-label-fg: var(--white);
+
+  background: var(--opt-bg);
+  border: 1.5px solid var(--opt-border);
   box-shadow: var(--neu-raised-sm);
-  color: var(--ink);
+  color: var(--opt-fg);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
     background 0.25s ease,
     border-color 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    filter 0.2s ease;
+}
+
+.neu-option .neu-option-label {
+  background: var(--opt-label-bg);
+  color: var(--opt-label-fg);
+}
+
+.neu-option.opt-0 {
+  --opt-bg: linear-gradient(145deg, #f04a5a, #d62839);
+  --opt-bg-hover: linear-gradient(145deg, #f56270, #e03546);
+  --opt-bg-active: linear-gradient(145deg, #c41f30, #a81828);
+  --opt-border: #b91c2c;
+  --opt-fg: var(--white);
+  --opt-label-bg: rgba(255, 255, 255, 0.22);
+  --opt-label-fg: var(--white);
+}
+
+.neu-option.opt-1 {
+  --opt-bg: linear-gradient(145deg, #3b8eef, #1f6fd1);
+  --opt-bg-hover: linear-gradient(145deg, #54a0f5, #2f7fe0);
+  --opt-bg-active: linear-gradient(145deg, #1860b8, #1452a0);
+  --opt-border: #1659ad;
+  --opt-fg: var(--white);
+  --opt-label-bg: rgba(255, 255, 255, 0.22);
+  --opt-label-fg: var(--white);
+}
+
+.neu-option.opt-2 {
+  --opt-bg: linear-gradient(145deg, #f0b429, #d9920a);
+  --opt-bg-hover: linear-gradient(145deg, #f5c041, #e6a31a);
+  --opt-bg-active: linear-gradient(145deg, #c48208, #a86d06);
+  --opt-border: #b87a08;
+  --opt-fg: var(--white);
+  --opt-label-bg: rgba(255, 255, 255, 0.22);
+  --opt-label-fg: var(--white);
+}
+
+.neu-option.opt-3 {
+  --opt-bg: linear-gradient(145deg, #3cb86a, #2a9a52);
+  --opt-bg-hover: linear-gradient(145deg, #4fc87b, #34ab5e);
+  --opt-bg-active: linear-gradient(145deg, #228545, #1a6e38);
+  --opt-border: #1f7a47;
+  --opt-fg: var(--white);
+  --opt-label-bg: rgba(255, 255, 255, 0.22);
+  --opt-label-fg: var(--white);
 }
 
 .neu-option:hover:not(:disabled) {
-  border-color: rgba(254, 129, 31, 0.55);
-  background: #fff8f2;
+  background: var(--opt-bg-hover);
+  border-color: var(--opt-border);
   box-shadow: var(--neu-raised);
   transform: translateY(-1px);
+  filter: brightness(1.04);
 }
 
 .neu-option:active:not(:disabled),
 .neu-option.is-selected {
-  background: linear-gradient(145deg, #fff1e4, #ffe0c4);
-  border-color: var(--orange);
-  box-shadow: var(--neu-inset-sm);
+  background: var(--opt-bg-active);
+  border-color: var(--opt-border);
+  box-shadow: var(--neu-inset-sm), 0 0 0 3px rgba(254, 129, 31, 0.55);
   transform: translateY(1px);
+  filter: none;
 }
 
 .neu-option.is-correct {
-  background: linear-gradient(145deg, #2f9e5f, #1f7a47);
-  border-color: #1f7a47;
-  color: var(--white);
-  box-shadow: var(--neu-raised-sm);
+  --opt-bg: linear-gradient(145deg, #2f9e5f, #1f7a47);
+  --opt-border: #1f7a47;
+  --opt-fg: var(--white);
+  --opt-label-bg: rgba(255, 255, 255, 0.25);
+  --opt-label-fg: var(--white);
+  background: var(--opt-bg);
+  border-color: var(--opt-border);
+  color: var(--opt-fg);
+  box-shadow: var(--neu-raised-sm), 0 0 0 3px rgba(47, 158, 95, 0.45);
+  filter: none;
 }
 
 .neu-option.is-wrong {
-  background: linear-gradient(145deg, #d45454, #a83232);
-  border-color: #a83232;
-  color: var(--white);
+  --opt-bg: linear-gradient(145deg, #d45454, #a83232);
+  --opt-border: #a83232;
+  --opt-fg: var(--white);
+  --opt-label-bg: rgba(255, 255, 255, 0.25);
+  --opt-label-fg: var(--white);
+  background: var(--opt-bg);
+  border-color: var(--opt-border);
+  color: var(--opt-fg);
   box-shadow: var(--neu-inset-sm);
+  filter: none;
+  opacity: 0.92;
 }
 
 @keyframes fade-up {
@@ -446,6 +515,112 @@ body {
 
 .animate-soft-glow {
   animation: soft-glow 2.8s ease-in-out infinite;
+}
+
+/* —— Score race（由下往上衝分） —— */
+.score-race-bar {
+  transform-origin: bottom center;
+  will-change: transform;
+  box-shadow: none;
+  border: none;
+  outline: none;
+  transition: none;
+}
+
+.score-race-col {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), filter 0.35s ease;
+}
+
+.score-race-col.is-surge {
+  z-index: 2;
+  transform: translateY(-10px) scale(1.06);
+  animation: score-surge 0.55s ease-out;
+}
+
+.score-race-col.is-surge .score-race-bar {
+  box-shadow: 0 0 0 3px rgba(254, 129, 31, 0.75);
+  filter: brightness(1.12);
+}
+
+.score-race-col.is-slump {
+  z-index: 1;
+  transform: translateY(6px) scale(0.94);
+  filter: grayscale(0.35) brightness(0.92);
+  animation: score-slump 0.55s ease-in-out;
+}
+
+.score-race-col.is-slump .score-race-bar {
+  box-shadow: 0 0 0 3px rgba(51, 50, 55, 0.45);
+  filter: saturate(0.65) brightness(0.88);
+}
+
+.score-race-col.is-crown {
+  z-index: 3;
+  animation: score-crown 1.2s ease-in-out;
+}
+
+.score-race-col.is-crown .score-race-bar {
+  /* 冠軍不使用邊框，只靠位移／亮度 */
+  filter: brightness(1.08);
+  box-shadow: none;
+}
+
+.score-race-tag {
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  animation: pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.score-race-tag-up {
+  background: #fe811f;
+  color: #fefefe;
+}
+
+.score-race-tag-down {
+  background: rgba(51, 50, 55, 0.72);
+  color: #fefefe;
+}
+
+@keyframes score-surge {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-14px) scale(1.1);
+  }
+  100% {
+    transform: translateY(-10px) scale(1.06);
+  }
+}
+
+@keyframes score-slump {
+  0%,
+  100% {
+    transform: translateY(6px) scale(0.94) rotate(0deg);
+  }
+  25% {
+    transform: translateY(8px) scale(0.92) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(4px) scale(0.94) rotate(2deg);
+  }
+  75% {
+    transform: translateY(8px) scale(0.93) rotate(-1deg);
+  }
+}
+
+@keyframes score-crown {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.08);
+  }
 }
 
 .delay-0 {

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { RankingChart } from "@/components/RankingChart";
+import { ScoreRace } from "@/components/ScoreRace";
+import { withAnsweredLeaderboard } from "@/lib/quiz/answered-leaderboard";
 import type { Media, RoomState } from "@/lib/quiz/types";
 import { youtubeEmbedSrc } from "@/lib/quiz/youtube";
 
@@ -113,21 +115,31 @@ export function AnswerMediaPopup({
           }`}
         >
           <div className="flex min-h-0 flex-col justify-center overflow-auto p-6 md:p-10">
-            <RankingChart
-              key={`${state.currentIndex}-${
-                state.answeredCount
-              }-${state.leaderboard
-                .map((p) => `${p.id}:${p.score}`)
-                .join(",")}`}
-              state={state}
-              title=""
-              podiumOnly
-              large
-            />
+            {reveal ? (
+              <ScoreRace
+                key={`popup-race-${state.currentIndex}`}
+                state={state}
+                title=""
+                large
+              />
+            ) : (
+              <RankingChart
+                key={`${state.currentIndex}-${
+                  state.answeredCount
+                }-${state.leaderboard
+                  .map((p) => `${p.id}:${p.score}`)
+                  .join(",")}`}
+                state={withAnsweredLeaderboard(state)}
+                title=""
+                podiumOnly
+                large
+              />
+            )}
             {answering && (
               <p className="mt-8 text-center text-base text-muted md:text-lg">
-                還有 {Math.max(0, state.playerCount - state.answeredCount)}{" "}
-                人尚未交卷
+                {state.answeredCount === 0
+                  ? "尚無挑戰者交卷"
+                  : `已交卷 ${state.answeredCount}/${state.playerCount} · 未交卷者不顯示於排名`}
               </p>
             )}
           </div>
